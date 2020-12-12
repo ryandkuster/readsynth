@@ -1,3 +1,0 @@
-import numpy
-
-numpy.random.normal(loc=100,scale=30.0,size=10)
