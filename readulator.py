@@ -231,6 +231,8 @@ def simulate_length(seq_ls):
 
     sampled_df.reset_index(inplace=True, drop=True)
 
+    sampled_df.to_csv('sampled_df.csv') #TODO add option to write raw digests to file
+
     print(f'the length of sample_seqs is {len(sampled_df)}')
     print(sampled_df['counts'].sum())
 
@@ -247,11 +249,11 @@ def read_writer(sampled_df, r1, r2, chr_name):
         r1_seq = row[0][args.a1s:args.a1s+args.l].ljust(args.l, 'G')
         r2_seq = reverse_comp(row[0])[args.a2s:args.a2s+args.l].ljust(args.l, 'G')
         for count in range(row[4]):
-            id += 1
             r1_mut, r1_score = read_mutator(r1_seq, args.prob_mx1, args.q_dt1, args.q_ls1)
             r2_mut, r2_score = read_mutator(r2_seq, args.prob_mx2, args.q_dt2, args.q_ls2)
             r1.write(f'@{id}:{idx}:{chr_name}:{row[1]} 1\n{r1_mut}\n+\n{r1_score}\n')
             r2.write(f'@{id}:{idx}:{chr_name}:{row[1]} 2\n{r2_mut}\n+\n{r2_score}\n')
+            id += 1
 
 
 def read_mutator(seq, prob_mx, scores_dt, q_ls):
@@ -275,14 +277,11 @@ def read_mutator(seq, prob_mx, scores_dt, q_ls):
     mut_seq = ''
     score = ''.join([np.random.choice(q_ls, 1, p=i)[0] for i in prob_mx])
     for base, q in zip(seq, score):
-        if base == 'N':
-            mut_seq += 'N'
-            continue
         p = scores_dt[q]
-        base_ls = ['A', 'C', 'G', 'T']
+        base_ls = ['A', 'C', 'G', 'T', 'N']
         base_ls.remove(base)
         base_ls.append(base)
-        p_ls = [p/3, p/3, p/3, 1-p]
+        p_ls = [p/4, p/4, p/4, p/4, 1-p]
         mut_seq += np.random.choice(base_ls, 1, p=p_ls)[0]
     return mut_seq, score
 
