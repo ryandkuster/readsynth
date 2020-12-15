@@ -131,8 +131,8 @@ def test_chrom(motif_dt, frag_len):
                 seq += line.rstrip().upper()
         seq_ls = digest_seq(seq, motif_dt, frag_len)
         seq_ls = second_digest(seq_ls, motif_dt, frag_len)
-        seq_ls = simulate_adapters(seq_ls)
-        seq_ls = simulate_length(seq_ls) #TODO digest_seq, second_digest, simulate_length, etc. need organization
+        seq_ls, len_ls = simulate_adapters(seq_ls)
+        seq_ls = simulate_length(seq_ls, len_ls) #TODO digest_seq, second_digest, simulate_length, etc. need organization
         read_writer(seq_ls, r1, r2, chr_name)
 
 
@@ -181,25 +181,27 @@ def complete_digest(seq, motif_dt):
 
 def simulate_adapters(seq_ls):
     print('adding random adapters')
-    second_ls = []
+    adapt_ls, len_ls = [], []
     for seq in seq_ls:
         r1_dapt, r1_id = random.choice(list(args.a1.items()))
         r2_dapt, r2_id = random.choice(list(args.a2.items()))
         ligated_seq = r1_dapt + seq + r2_dapt
-        second_ls.append([ligated_seq, r1_id, r2_id])
+        adapt_ls.append([ligated_seq, r1_id, r2_id])
+        len_ls.append(len(seq))
 
-    return second_ls
+    return adapt_ls, len_ls
 
 
-def simulate_length(seq_ls):
+def simulate_length(seq_ls, len_ls):
     df = pd.DataFrame(seq_ls, columns = ['sequence', 'r1_id', 'r2_id'])
     df['length'] = [len(i[0]) for i in seq_ls]
+    df['fragment_length'] = len_ls
     df.sort_values(['length'], ascending=[True], inplace=True)
     df.reset_index(inplace=True, drop=True)
 
     print(df)
 
-    #df.to_csv('raw_digest_df.csv', index=None) #TODO add option to write raw digests to file
+    df.to_csv('raw_digest_df.csv', index=None) #TODO add option to write raw digests to file
     read_count = len(df) #TODO keep this in case you want to multiply to get coverage
     mean = 400 #TODO add argument MEAN
     sd = 100 #TODO add argument SD
@@ -212,7 +214,7 @@ def simulate_length(seq_ls):
     for i in range(max(min(df['length']), min(draw_ls)), min(max(df['length']), max(draw_ls))+1):
         draw_dt[i] = draw_ls.count(i)
 
-    sampled_df = pd.DataFrame(columns=['sequence', 'r1_id', 'r2_id', 'length'])
+    sampled_df = pd.DataFrame(columns=['sequence', 'r1_id', 'r2_id', 'length', 'fragment_length'])
     counts = []
 
     for length, draws in draw_dt.items():
@@ -248,11 +250,11 @@ def read_writer(sampled_df, r1, r2, chr_name):
     for idx, row in sampled_df.iterrows():
         r1_seq = row[0][args.a1s:args.a1s+args.l].ljust(args.l, 'G')
         r2_seq = reverse_comp(row[0])[args.a2s:args.a2s+args.l].ljust(args.l, 'G')
-        for count in range(row[4]):
+        for count in range(row[5]):
             r1_mut, r1_score = read_mutator(r1_seq, args.prob_mx1, args.q_dt1, args.q_ls1)
             r2_mut, r2_score = read_mutator(r2_seq, args.prob_mx2, args.q_dt2, args.q_ls2)
-            r1.write(f'@{id}:{idx}:{chr_name}:{row[1]} 1\n{r1_mut}\n+\n{r1_score}\n')
-            r2.write(f'@{id}:{idx}:{chr_name}:{row[1]} 2\n{r2_mut}\n+\n{r2_score}\n')
+            r1.write(f'@{id}:{idx}:{row[3]}:{row[4]}:{row[1]}:{chr_name} 1\n{r1_mut}\n+\n{r1_score}\n')
+            r2.write(f'@{id}:{idx}:{row[3]}:{row[4]}:{row[2]}:{chr_name} 2\n{r2_mut}\n+\n{r2_score}\n')
             id += 1
 
 
