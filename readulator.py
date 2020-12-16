@@ -21,6 +21,9 @@ def parse_user_input():
     parser.add_argument('-m1', type=str, required=True, nargs='+', metavar='',
             help='space separated list of RE motifs (e.g., AluI = AG/CT, HindIII = A/AGCTT), SmlI = C/TYRAG')
 
+    parser.add_argument('-m2', type=str, required=False, nargs='+', metavar='',
+            help='space separated list of RE motifs (e.g., AluI = AG/CT, HindIII = A/AGCTT), SmlI = C/TYRAG')
+
     parser.add_argument('-l', type=int, required=False, metavar='',
             help='desired read length of final simulated reads (defaults to 250 or given q1/q2 profiles)')
 
@@ -56,7 +59,7 @@ def parse_user_input():
     return args
 
 
-def iupac_motifs():
+def iupac_motifs(arg_m):
     motif_dt = {}
     iupac_dt = {'/': '',
                 'A': 'A',
@@ -75,7 +78,7 @@ def iupac_motifs():
                 'V': '[ACG]',
                 'N': '[ACGT]'}
 
-    for motif in args.m1:
+    for motif in arg_m:
         reg_motif = ''
         for char in motif.upper():
             reg_motif += iupac_dt[char]
@@ -137,8 +140,12 @@ def test_chrom(motif_dt, frag_len):
 
 
 def digest_seq(seq, motif_dt, frag_len):
+    '''
+    if args.m2, preserves motif cut site
+    '''
     seq_ls = []
     for motif, offset in motif_dt.items():
+        offset = 0 if args.m2 else offset
         for idx in re.finditer(motif, seq):
             start = idx.start()+offset
             end = start + frag_len
@@ -163,12 +170,34 @@ def second_digest(seq_ls, motif_dt, frag_len):
     second_ls = []
     for seq in seq_ls:
         second_ls += digest_seq(seq, motif_dt, frag_len)
+
+    second_ls += [reverse_comp(seq) for seq in second_ls]
+
+    if args.m2:
+        second_ls = [orientation_test(i) for i in second_ls]
+        second_ls = [i for i in second_ls if i]
+
     if args.complete == 1:
         print('including only complete digests')
         second_ls = [complete_digest(i, motif_dt) for i in second_ls]
         second_ls = [i for i in second_ls if i]
 
     return second_ls
+
+
+def orientation_test(seq):
+    '''
+    run only if m2 defined
+    reads passed here contain intact RE motifs
+    (i.e., AG/CT remains AGCT, not CT)
+    '''
+    for motif1, offset1 in motif_dt1.items():
+        if seq.startswith(motif1):
+            for motif2, offset2 in motif_dt2.items():
+                if seq.endswith(motif2):
+                    return seq[offset1:-offset2]
+
+    return None
 
 
 def complete_digest(seq, motif_dt):
@@ -202,6 +231,9 @@ def simulate_length(seq_ls, len_ls):
     print(df)
 
     df.to_csv('raw_digest_df.csv', index=None) #TODO add option to write raw digests to file
+
+    sys.exit()
+
     read_count = len(df) #TODO keep this in case you want to multiply to get coverage
     mean = 400 #TODO add argument MEAN
     sd = 100 #TODO add argument SD
@@ -309,7 +341,14 @@ if __name__ == '__main__':
         args.prob_mx2, args.q_dt2, args.q_ls2 = get_qscores(args.q2)
         args.l = len(args.prob_mx2)
 
-    motif_dt = iupac_motifs()
+    motif_dt = {}
+    motif_dt1 = iupac_motifs(args.m1)
+    motif_dt.update(motif_dt1)
+
+    if args.m2:
+        motif_dt2 = iupac_motifs(args.m2)
+        motif_dt.update(motif_dt2)
+
     frag_len = args.f if args.f else 1000
     test_chrom(motif_dt, frag_len)
 
