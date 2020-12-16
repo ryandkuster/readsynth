@@ -283,8 +283,8 @@ def read_writer(sampled_df, r1, r2, chr_name):
         for count in range(row[5]):
             r1_mut, r1_score = read_mutator(r1_seq, args.prob_mx1, args.q_dt1, args.q_ls1)
             r2_mut, r2_score = read_mutator(r2_seq, args.prob_mx2, args.q_dt2, args.q_ls2)
-            r1.write(f'@{id}:{idx}:{row[3]}:{row[4]}:{row[1]}:{chr_name} 1\n{r1_mut}\n+\n{r1_score}\n')
-            r2.write(f'@{id}:{idx}:{row[3]}:{row[4]}:{row[2]}:{chr_name} 2\n{r2_mut}\n+\n{r2_score}\n')
+            r1.write(f'@{id}:{idx}:{row[3]}:{row[4]}:{row[1]}:{row[2]}:{chr_name} 1\n{r1_mut}\n+\n{r1_score}\n')
+            r2.write(f'@{id}:{idx}:{row[3]}:{row[4]}:{row[1]}:{row[2]}:{chr_name} 2\n{r2_mut}\n+\n{r2_score}\n')
             id += 1
 
 
