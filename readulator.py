@@ -232,8 +232,6 @@ def simulate_length(seq_ls, len_ls):
 
     df.to_csv('raw_digest_df.csv', index=None) #TODO add option to write raw digests to file
 
-    sys.exit()
-
     read_count = len(df) #TODO keep this in case you want to multiply to get coverage
     mean = 400 #TODO add argument MEAN
     sd = 100 #TODO add argument SD
