@@ -6,8 +6,8 @@ import numpy as np
 import pandas as pd
 import random
 import re
+import sys
 
-import sys #TODO delete this is not used
 
 def parse_user_input():
     parser = argparse.ArgumentParser(description='simulate RE digest on genome')
@@ -48,11 +48,20 @@ def parse_user_input():
     parser.add_argument('-a2', type=str, required=True, metavar='',
             help='file containing tab/space-separated adapters and identifiers that attach 3\' to read')
 
-    parser.add_argument('-q1', type=str, required=True, metavar='',
+    parser.add_argument('-q1', type=str, required=False, metavar='',
             help='file containing R1 q scores in csv format (see ngsComposer tool crinoid)')
 
-    parser.add_argument('-q2', type=str, required=True, metavar='',
+    parser.add_argument('-q2', type=str, required=False, metavar='',
             help='file containing R2 q scores in csv format (see ngsComposer tool crinoid)')
+
+    parser.add_argument('-r1', type=str, required=False, metavar='',
+            help='file containing R1 fastq file')
+
+    parser.add_argument('-r2', type=str, required=False, metavar='',
+            help='file containing R2 fastq file')
+
+    parser.add_argument('-p', type=int, required=False, metavar='',
+            help='if using r1/r2 for profile, percent of reads to sample')
 
     args = parser.parse_args()
 
@@ -110,8 +119,22 @@ def get_qscores(arg):
     for idx, row in df.iterrows():
         q_ls = [i/sum(row) for i in row]
         prob_mx.append(q_ls)
-    #TODO remove extra length in profile or autodetect length
+
     return prob_mx, scores_dt, scores_ls
+
+
+def open_fastq(fastq):
+    print(f'sampling {args.p} percent of scores from {fastq}')
+    perc_keep = [int(args.p)/100, 1-(int(args.p)/100)]
+    i = 0
+    with open(fastq) as f, open(fastq + '_sampled_scores.csv', 'w') as out:
+        for line in f:
+            i += 1
+            if i == 4:
+                keep = np.random.choice([True, False], 1, p=perc_keep)
+                if keep:
+                    out.write(line)
+                i = 0
 
 
 def test_chrom(motif_dt, frag_len):
@@ -136,7 +159,10 @@ def test_chrom(motif_dt, frag_len):
         seq_ls = second_digest(seq_ls, motif_dt, frag_len)
         seq_ls, len_ls = simulate_adapters(seq_ls)
         seq_ls = simulate_length(seq_ls, len_ls) #TODO digest_seq, second_digest, simulate_length, etc. need organization
-        read_writer(seq_ls, r1, r2, chr_name)
+        if args.r1:
+            read_writer_samples(seq_ls, r1, r2, chr_name)
+        else:
+            read_writer(seq_ls, r1, r2, chr_name)
 
 
 def digest_seq(seq, motif_dt, frag_len):
@@ -276,6 +302,7 @@ def read_writer(sampled_df, r1, r2, chr_name):
     args.a1s is where to begin in the R1 adapter (33 for ours, I think)
     args.a2s is where to begin in the R2 adapter (34 for ours, I think)
     '''
+    print(f'writing simulated reads')
     id = 0
     for idx, row in sampled_df.iterrows():
         r1_seq = row[0][args.a1s:args.a1s+args.l].ljust(args.l, 'G')
@@ -289,22 +316,6 @@ def read_writer(sampled_df, r1, r2, chr_name):
 
 
 def read_mutator(seq, prob_mx, scores_dt, q_ls):
-#    #TODO OPTIMIZATION NEEDED!
-#    score = ''
-#    mut_seq = ''
-#    for idx, base in enumerate(seq):
-#        q = np.random.choice(q_ls, 1, p=prob_mx[idx])[0]
-#        score += q
-#        if base == 'N':
-#            mut_seq += 'N'
-#            continue
-#        p = scores_dt[q]
-#        base_ls = ['A', 'C', 'G', 'T']
-#        base_ls.remove(base)
-#        base_ls.append(base)
-#        p_ls = [p/3, p/3, p/3, 1-p]
-#        mut_seq += np.random.choice(base_ls, 1, p=p_ls)[0]
-#    return mut_seq, score
     #TODO OPTIMIZATION NEEDED!
     mut_seq = ''
     score = ''.join([np.random.choice(q_ls, 1, p=i)[0] for i in prob_mx])
@@ -318,9 +329,45 @@ def read_mutator(seq, prob_mx, scores_dt, q_ls):
     return mut_seq, score
 
 
+def read_writer_samples(sampled_df, r1, r2, chr_name):
+    '''
+    args.a1s is where to begin in the R1 adapter (33 for ours, I think)
+    args.a2s is where to begin in the R2 adapter (34 for ours, I think)
+    '''
+    print(f'writing simulated reads')
+    sampled_q1 = list(pd.read_csv(args.r1 + '_sampled_scores.csv', names=['score'])['score'].values)
+    sampled_q2 = list(pd.read_csv(args.r2 + '_sampled_scores.csv', names=['score'])['score'].values)
+    args.l = len(max(sampled_q1, key=len))
+    id = 0
+    for idx, row in sampled_df.iterrows():
+        r1_seq = row[0][args.a1s:args.a1s+args.l].ljust(args.l, 'G')
+        r2_seq = reverse_comp(row[0])[args.a2s:args.a2s+args.l].ljust(args.l, 'G')
+        for count in range(row[5]):
+            r1_mut, r1_score = read_mutator_samples(r1_seq, args.q_dt1, sampled_q1)
+            r2_mut, r2_score = read_mutator_samples(r2_seq, args.q_dt2, sampled_q2)
+            r1.write(f'@{id}:{idx}:{row[3]}:{row[4]}:{row[1]}:{row[2]}:{chr_name} 1\n{r1_mut}\n+\n{r1_score}\n')
+            r2.write(f'@{id}:{idx}:{row[3]}:{row[4]}:{row[1]}:{row[2]}:{chr_name} 2\n{r2_mut}\n+\n{r2_score}\n')
+            id += 1
+
+
+def read_mutator_samples(seq, scores_dt, sampled_q):
+    mut_seq = ''
+    score = random.choice(sampled_q)
+    for base, q in zip(seq, score):
+        p = scores_dt[q]
+        base_ls = ['A', 'C', 'G', 'T', 'N']
+        base_ls.remove(base)
+        base_ls.append(base)
+        p_ls = [p/4, p/4, p/4, p/4, 1-p]
+        mut_seq += np.random.choice(base_ls, 1, p=p_ls)[0]
+    return mut_seq, score
+
 
 if __name__ == '__main__':
     args = parse_user_input()
+
+    if args.r1 and not args.q1:
+        sys.exit('please provide q scores profile for R1')
 
     args.l = args.l if args.l else 250
 
@@ -338,6 +385,12 @@ if __name__ == '__main__':
     if args.q2:
         args.prob_mx2, args.q_dt2, args.q_ls2 = get_qscores(args.q2)
         args.l = len(args.prob_mx2)
+
+    if args.r1:
+        open_fastq(args.r1)
+
+    if args.r2:
+        open_fastq(args.r2)
 
     motif_dt = {}
     motif_dt1 = iupac_motifs(args.m1)
