@@ -1,3 +1,8 @@
 /raw_data/*
 *fastq
 *tiff
+/samples/*
+/tests/*
+
+.DS_Store
+__pycache__/

@@ -8,6 +8,10 @@ import random
 import re
 import sys
 
+#TODO consider removing l argument, as q scores are necessary
+#TODO automate detection of a1s/a2s? (find common adapter? assumes N composition of pos1...)
+#TODO check if genome compressed
+#TODO check if adapters contain RE motif offsets
 
 def parse_user_input():
     parser = argparse.ArgumentParser(description='simulate RE digest on genome')
@@ -19,34 +23,43 @@ def parse_user_input():
             help='path to store output')
 
     parser.add_argument('-m1', type=str, required=True, nargs='+', metavar='',
-            help='space separated list of RE motifs (e.g., AluI = AG/CT, HindIII = A/AGCTT), SmlI = C/TYRAG')
+            help='space separated list of RE motifs (e.g., AluI = AG/CT, HindIII = A/AGCTT, SmlI = C/TYRAG)')
 
     parser.add_argument('-m2', type=str, required=False, nargs='+', metavar='',
-            help='space separated list of RE motifs (e.g., AluI = AG/CT, HindIII = A/AGCTT), SmlI = C/TYRAG')
+            help='space separated list of RE motifs (e.g., AluI = AG/CT, HindIII = A/AGCTT, SmlI = C/TYRAG)')
 
     parser.add_argument('-l', type=int, required=False, metavar='',
             help='desired read length of final simulated reads (defaults to 250 or given q1/q2 profiles)')
 
+    parser.add_argument('-t', type=str, required=False,  metavar='',
+            help='test mode: create newline-separated file of RE digested sequences only')
+
     parser.add_argument('-n', type=int, required=True, metavar='',
             help='number of reads to simulate (currently per chromosome)')
 
-    parser.add_argument('-a1s', type=int, required=True, metavar='',
-            help='index (beginning with 0) of read SBS start site within R1 adapter')
+    parser.add_argument('-mean', type=int, required=True, metavar='',
+            help='mean (in bp) of read lengths after size selection')
 
-    parser.add_argument('-a2s', type=int, required=True, metavar='',
-            help='index (beginning with 0) of read SBS start site within R2 adapter')
+    parser.add_argument('-sd', type=int, required=True, metavar='',
+            help='standard deviation (in bp) of read lengths after size selection')
 
     parser.add_argument('-f', type=int, required=False, metavar='',
-            help='max fragment length after first cut (optional, defaults to 1000bp)')
+            help='max fragment length after first cut (optional, defaults to mean + 6 stdevs)')
 
     parser.add_argument('-complete', type=int, required=False, metavar='',
             help='use \'1\' for complete digestion of fragments (fragments will not contain internal RE sites)')
 
     parser.add_argument('-a1', type=str, required=True, metavar='',
-            help='file containing tab/space-separated adapters and identifiers that attach 5\' to read')
+            help='file containing tab/space-separated adapters and barcode that attach 5\' to read')
 
     parser.add_argument('-a2', type=str, required=True, metavar='',
-            help='file containing tab/space-separated adapters and identifiers that attach 3\' to read')
+            help='file containing tab/space-separated adapters and barcode that attach 3\' to read')
+
+#    parser.add_argument('-a1s', type=int, required=True, metavar='',
+#            help='index (beginning with 0) of read SBS start site within R1 adapter')
+#
+#    parser.add_argument('-a2s', type=int, required=True, metavar='',
+#            help='index (beginning with 0) of read SBS start site within R2 adapter')
 
     parser.add_argument('-q1', type=str, required=False, metavar='',
             help='file containing R1 q scores in csv format (see ngsComposer tool crinoid)')
@@ -55,10 +68,10 @@ def parse_user_input():
             help='file containing R2 q scores in csv format (see ngsComposer tool crinoid)')
 
     parser.add_argument('-r1', type=str, required=False, metavar='',
-            help='file containing R1 fastq file')
+            help='R1 fastq file to sample Q scores')
 
     parser.add_argument('-r2', type=str, required=False, metavar='',
-            help='file containing R2 fastq file')
+            help='R2 fastq file to sample Q scores')
 
     parser.add_argument('-p', type=int, required=False, metavar='',
             help='if using r1/r2 for profile, percent of reads to sample')
@@ -97,13 +110,26 @@ def iupac_motifs(arg_m):
 
 
 def get_adapters(arg):
+    '''
+    open adapters file and store adapters and barcodes in dt
+    '''
     adapters_dt = {}
     with open(arg) as f:
         for line in f:
             adapter, id = line.rstrip().split()
             adapters_dt[adapter] = id
 
-    return adapters_dt
+    sbs_start = get_sbs_start(list(adapters_dt.keys()))
+
+    return adapters_dt, sbs_start
+
+
+def get_sbs_start(adapter_ls):
+    for idx, pos in enumerate(adapter_ls[0]):
+        for seq in adapter_ls:
+            if adapter_ls[0][:idx] not in seq:
+                return idx-1
+
 
 
 def get_qscores(arg):
@@ -137,28 +163,46 @@ def open_fastq(fastq):
                 i = 0
 
 
-def test_chrom(motif_dt, frag_len):
-    print('converting fasta')
+'''
+begin main simulation
+'''
+
+
+def readulator_main(motif_dt, frag_len):
+    '''
+    process fastq sequences as adapter-ligated fragments
+    '''
+    print('\nreading fasta\n')
     with open(args.genome) as fasta,\
          open('simulated_R1.fastq', 'w') as r1,\
          open('simulated_R2.fastq', 'w') as r2:
-
+        seq = ''
         for line in fasta:
-            if line.startswith('>'):
-                chr_name = line.rstrip()[1:].replace(' ', '_')
-                try:
-                    seq_ls = digest_seq(seq, motif_dt, frag_len)
-                    seq_ls = second_digest(seq_ls, motif_dt, frag_len)
-                    #TODO add steps up here
-                except UnboundLocalError:
-                    pass
+            if line.startswith('>') and seq:
+                seq_ls = digest_seq(seq, motif_dt, frag_len)
+                seq_ls = second_digest(seq_ls, motif_dt, frag_len)
+                seq_ls, len_ls = simulate_adapters(seq_ls)
+                seq_ls = simulate_length(seq_ls, len_ls, chr_name)
+
+                if args.r1:
+                    read_writer_samples(seq_ls, r1, r2, chr_name)
+                else:
+                    read_writer(seq_ls, r1, r2, chr_name)
+
                 seq = ''
+                chr_name = line.rstrip()[1:].replace(' ', '_')
+                print(f'processing {chr_name}')
+            elif line.startswith('>'):
+                chr_name = line.rstrip()[1:].replace(' ', '_')
+                print(f'processing {chr_name}')
             else:
                 seq += line.rstrip().upper()
+
         seq_ls = digest_seq(seq, motif_dt, frag_len)
         seq_ls = second_digest(seq_ls, motif_dt, frag_len)
         seq_ls, len_ls = simulate_adapters(seq_ls)
-        seq_ls = simulate_length(seq_ls, len_ls) #TODO digest_seq, second_digest, simulate_length, etc. need organization
+        seq_ls = simulate_length(seq_ls, len_ls, chr_name)
+
         if args.r1:
             read_writer_samples(seq_ls, r1, r2, chr_name)
         else:
@@ -175,8 +219,9 @@ def digest_seq(seq, motif_dt, frag_len):
         for idx in re.finditer(motif, seq):
             start = idx.start()+offset
             end = start + frag_len
-            seq_ls.append(seq[start:end])
-
+            fragment = seq[start:end]
+            if fragment not in motif_dt:
+                seq_ls.append(seq[start:end])
     seq_ls = [reverse_comp(i) for i in seq_ls]
 
     return seq_ls
@@ -196,7 +241,6 @@ def second_digest(seq_ls, motif_dt, frag_len):
     second_ls = []
     for seq in seq_ls:
         second_ls += digest_seq(seq, motif_dt, frag_len)
-
     second_ls += [reverse_comp(seq) for seq in second_ls]
 
     if args.m2:
@@ -216,17 +260,27 @@ def orientation_test(seq):
     run only if m2 defined
     reads passed here contain intact RE motifs
     (i.e., AG/CT remains AGCT, not CT)
+
+    this is necessary if sticky ends will be used in ligating
+    fragments to adapters
     '''
     for motif1, offset1 in motif_dt1.items():
-        if seq.startswith(motif1):
+        if re.search('^'+motif1, seq):
             for motif2, offset2 in motif_dt2.items():
-                if seq.endswith(motif2):
-                    return seq[offset1:-offset2]
+                if re.search(motif2+'$', seq):
+                    if offset2 == 0:
+                        return seq[offset1:]
+                    else:
+                        return seq[offset1:-offset2]
 
     return None
 
 
 def complete_digest(seq, motif_dt):
+    '''
+    remove any fragments containing an internal cut site for any of the
+    restriction enzymes used
+    '''
     for motif in motif_dt:
         if motif in seq [1:-1]:
             return False
@@ -235,6 +289,11 @@ def complete_digest(seq, motif_dt):
 
 
 def simulate_adapters(seq_ls):
+    '''
+    simulate ligation of adapters to sequences
+    adapters must contain RE motif if sticky ends are used
+    the associated barcode is saved alongside the read as r1/2_id
+    '''
     print('adding random adapters')
     adapt_ls, len_ls = [], []
     for seq in seq_ls:
@@ -247,7 +306,7 @@ def simulate_adapters(seq_ls):
     return adapt_ls, len_ls
 
 
-def simulate_length(seq_ls, len_ls):
+def simulate_length(seq_ls, len_ls, chr_name):
     df = pd.DataFrame(seq_ls, columns = ['sequence', 'r1_id', 'r2_id'])
     df['length'] = [len(i[0]) for i in seq_ls]
     df['fragment_length'] = len_ls
@@ -256,14 +315,12 @@ def simulate_length(seq_ls, len_ls):
 
     print(df)
 
-    df.to_csv('raw_digest_df.csv', index=None) #TODO add option to write raw digests to file
+    df.to_csv('raw_digest_' + chr_name + '.csv', index=None) #TODO add option to write raw digests to file per file
 
     read_count = len(df) #TODO keep this in case you want to multiply to get coverage
-    mean = 400 #TODO add argument MEAN
-    sd = 100 #TODO add argument SD
     total_reads = args.n #TODO add argument COVERAGE
 
-    draw_ls = np.random.normal(loc=mean,scale=sd,size=total_reads)
+    draw_ls = np.random.normal(loc=args.mean,scale=args.sd,size=total_reads)
     draw_ls = [round(i) for i in draw_ls]
     draw_dt = {}
 
@@ -292,17 +349,17 @@ def simulate_length(seq_ls, len_ls):
     sampled_df.to_csv('sampled_df.csv') #TODO add option to write raw digests to file
 
     print(f'the length of sample_seqs is {len(sampled_df)}')
-    print(sampled_df['counts'].sum())
+    reads_to_write = sampled_df['counts'].sum()
+    print(f'writing {reads_to_write} simulated reads')
 
     return sampled_df
 
 
 def read_writer(sampled_df, r1, r2, chr_name):
     '''
-    args.a1s is where to begin in the R1 adapter (33 for ours, I think)
-    args.a2s is where to begin in the R2 adapter (34 for ours, I think)
+    args.a1s is where to begin in the R1 adapter
+    args.a2s is where to begin in the R2 adapter
     '''
-    print(f'writing simulated reads')
     id = 0
     for idx, row in sampled_df.iterrows():
         r1_seq = row[0][args.a1s:args.a1s+args.l].ljust(args.l, 'G')
@@ -316,7 +373,9 @@ def read_writer(sampled_df, r1, r2, chr_name):
 
 
 def read_mutator(seq, prob_mx, scores_dt, q_ls):
-    #TODO OPTIMIZATION NEEDED!
+    '''
+    using pure, per-base probability profile, mutate bases
+    '''
     mut_seq = ''
     score = ''.join([np.random.choice(q_ls, 1, p=i)[0] for i in prob_mx])
     for base, q in zip(seq, score):
@@ -351,6 +410,9 @@ def read_writer_samples(sampled_df, r1, r2, chr_name):
 
 
 def read_mutator_samples(seq, scores_dt, sampled_q):
+    '''
+    using actual sampled per-read q scores, mutate bases
+    '''
     mut_seq = ''
     score = random.choice(sampled_q)
     for base, q in zip(seq, score):
@@ -363,8 +425,115 @@ def read_mutator_samples(seq, scores_dt, sampled_q):
     return mut_seq, score
 
 
+'''
+begin simulation of restriction digests only
+'''
+
+
+def readulator_digest_only(motif_dt, frag_len):
+    '''
+    process fastq sequences for digestion simulation only
+    '''
+
+    print('\nreading fasta\n')
+
+    with open(args.genome) as fasta,\
+         open('digested_R1.txt', 'w') as r1,\
+         open('digested_R2.txt', 'w') as r2:
+        seq = ''
+        for line in fasta:
+            if line.startswith('>') and seq:
+                seq_ls = digest_seq(seq, motif_dt, frag_len)
+                seq_ls = second_digest(seq_ls, motif_dt, frag_len)
+                seq_ls = basic_simulate_length(seq_ls, chr_name)
+                basic_writer(seq_ls, r1, r2)
+
+                seq = ''
+                chr_name = line.rstrip()[1:].replace(' ', '_')
+                print(f'processing {chr_name}')
+            elif line.startswith('>'):
+                chr_name = line.rstrip()[1:].replace(' ', '_')
+                print(f'processing {chr_name}')
+            else:
+                seq += line.rstrip().upper()
+
+        seq_ls = digest_seq(seq, motif_dt, frag_len)
+        seq_ls = second_digest(seq_ls, motif_dt, frag_len)
+        seq_ls = basic_simulate_length(seq_ls, chr_name)
+        basic_writer(seq_ls, r1, r2)
+
+
+def basic_simulate_length(seq_ls, chr_name):
+    df = pd.DataFrame(seq_ls, columns = ['sequence'])
+    df['length'] = [len(i) for i in seq_ls]
+    df.sort_values(['length'], ascending=[True], inplace=True)
+    df.reset_index(inplace=True, drop=True)
+
+    print(df)
+
+    df.to_csv('raw_digest_' + chr_name + '.csv', index=None) #TODO add option to write raw digests to file per file
+
+    read_count = len(df) #TODO keep this in case you want to multiply to get coverage
+    total_reads = args.n #TODO add argument COVERAGE
+
+    draw_ls = np.random.normal(loc=args.mean,scale=args.sd,size=total_reads)
+    draw_ls = [round(i) for i in draw_ls]
+    draw_dt = {}
+
+    for i in range(max(min(df['length']), min(draw_ls)), min(max(df['length']), max(draw_ls))+1):
+        draw_dt[i] = draw_ls.count(i)
+
+    sampled_df = pd.DataFrame(columns=['sequence', 'length'])
+    counts = []
+
+    for length, draws in draw_dt.items():
+        tmp_df =  df.loc[df['length'] == length]
+        if len(tmp_df) == 0:
+            continue
+        indices = [i for i in range(len(tmp_df))]
+        sampled_idx = random.choices(indices, k=draws)
+        counts += [sampled_idx.count(idx) for idx in indices]
+        sampled_df = pd.concat([sampled_df, tmp_df])
+
+    sampled_df['counts'] = counts
+
+    index_names = sampled_df[sampled_df['counts'] == 0].index
+    sampled_df.drop(index_names, inplace=True)
+
+    sampled_df.reset_index(inplace=True, drop=True)
+
+    sampled_df.to_csv('sampled_df.csv')
+
+    print(f'the length of sample_seqs is {len(sampled_df)}')
+    reads_to_write = sampled_df['counts'].sum()
+    print(f'writing {reads_to_write} simulated reads')
+
+    return sampled_df
+
+
+def basic_writer(seq_ls, r1, r2):
+    for r1_seq in seq_ls['sequence'].values:
+        r2_seq = reverse_comp(r1_seq)
+        r1.write(r1_seq + '\n')
+        r2.write(r2_seq + '\n')
+
+
 if __name__ == '__main__':
     args = parse_user_input()
+
+    motif_dt = {}
+    motif_dt1 = iupac_motifs(args.m1)
+    motif_dt.update(motif_dt1)
+
+    if args.m2:
+        motif_dt2 = iupac_motifs(args.m2)
+        motif_dt.update(motif_dt2)
+
+    frag_len = args.f if args.f else (args.mean + (6*args.sd))
+
+    if args.t:
+        readulator_digest_only(motif_dt, frag_len)
+        sys.exit()
 
     if args.r1 and not args.q1:
         sys.exit('please provide q scores profile for R1')
@@ -372,10 +541,10 @@ if __name__ == '__main__':
     args.l = args.l if args.l else 250
 
     if args.a1:
-        args.a1 = get_adapters(args.a1)
+        args.a1, args.a1s = get_adapters(args.a1)
 
     if args.a2:
-        args.a2 = get_adapters(args.a2)
+        args.a2, args.a2s = get_adapters(args.a2)
         args.a2 = {reverse_comp(adapter): id for adapter, id in args.a2.items()}
 
     if args.q1:
@@ -392,16 +561,6 @@ if __name__ == '__main__':
     if args.r2:
         open_fastq(args.r2)
 
-    motif_dt = {}
-    motif_dt1 = iupac_motifs(args.m1)
-    motif_dt.update(motif_dt1)
+    readulator_main(motif_dt, frag_len)
 
-    if args.m2:
-        motif_dt2 = iupac_motifs(args.m2)
-        motif_dt.update(motif_dt2)
-
-    frag_len = args.f if args.f else 1000
-    test_chrom(motif_dt, frag_len)
-
-    #TODO check if genome compressed
 
