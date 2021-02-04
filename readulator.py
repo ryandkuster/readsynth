@@ -55,12 +55,6 @@ def parse_user_input():
     parser.add_argument('-a2', type=str, required=True, metavar='',
             help='file containing tab/space-separated adapters and barcode that attach 3\' to read')
 
-#    parser.add_argument('-a1s', type=int, required=True, metavar='',
-#            help='index (beginning with 0) of read SBS start site within R1 adapter')
-#
-#    parser.add_argument('-a2s', type=int, required=True, metavar='',
-#            help='index (beginning with 0) of read SBS start site within R2 adapter')
-
     parser.add_argument('-q1', type=str, required=False, metavar='',
             help='file containing R1 q scores in csv format (see ngsComposer tool crinoid)')
 

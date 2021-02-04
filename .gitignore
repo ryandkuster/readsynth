@@ -2,7 +2,7 @@
 *fastq
 *tiff
 /samples/*
-/tests/*
+/tests/test_project*
 
 .DS_Store
 __pycache__/
