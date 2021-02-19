@@ -1,8 +1,10 @@
 #!/usr/bin/env python
 
 import argparse
+import math
 import matplotlib as plt
 import numpy as np
+import os
 import pandas as pd
 import random
 import re
@@ -166,7 +168,6 @@ def readulator_main(motif_dt, frag_len):
     '''
     process fastq sequences as adapter-ligated fragments
     '''
-    print('\nreading fasta\n')
     with open(args.genome) as fasta,\
          open('simulated_R1.fastq', 'w') as r1,\
          open('simulated_R2.fastq', 'w') as r2:
@@ -231,6 +232,7 @@ def reverse_comp(seq):
 
 
 def second_digest(seq_ls, motif_dt, frag_len):
+    #TODO add test for empty lists
     print('performing second digest')
     second_ls = []
     for seq in seq_ls:
@@ -246,6 +248,10 @@ def second_digest(seq_ls, motif_dt, frag_len):
         second_ls = [complete_digest(i, motif_dt) for i in second_ls]
         second_ls = [i for i in second_ls if i]
 
+    if len(second_ls) == 0:
+        return second_ls
+
+    digest_stats(second_ls)
     return second_ls
 
 
@@ -282,6 +288,28 @@ def complete_digest(seq, motif_dt):
     return seq
 
 
+def digest_stats(seq_ls):
+    stats_dt = {}
+    len_ls = [len(seq) for seq in seq_ls]
+    for num in range(args.sd, max(max(len_ls), args.sd)+args.sd, args.sd):
+        stats_dt[int(math.ceil(num / 10.0)) * 10] = 0
+
+    print(f'average fragment length: {round(sum(map(len, seq_ls)) / len(seq_ls), 2)}')
+    print(f'number of fragments: {len(seq_ls)}')
+
+    col, row = os.get_terminal_size()
+    for leng in len_ls:
+        for bin in stats_dt.keys():
+            if leng <= bin:
+                stats_dt[bin] += 1
+                break
+
+    highest = stats_dt[max(stats_dt, key=lambda i: stats_dt[i])]
+    denom = highest/(col-10)
+    for k, v in stats_dt.items():
+        print(str(k) + ':' + ' ' * (len(str(max(stats_dt)))-len(str(k))) + '|' * round(v/denom))
+
+
 def simulate_adapters(seq_ls):
     '''
     simulate ligation of adapters to sequences
@@ -307,9 +335,7 @@ def simulate_length(seq_ls, len_ls, chr_name):
     df.sort_values(['length'], ascending=[True], inplace=True)
     df.reset_index(inplace=True, drop=True)
 
-    print(df)
-
-    df.to_csv('raw_digest_' + chr_name + '.csv', index=None) #TODO add option to write raw digests to file per file
+    df.to_csv('raw_digest_' + chr_name + '.csv', index=None, header=False) #TODO add option to write raw digests to file per file
 
     read_count = len(df) #TODO keep this in case you want to multiply to get coverage
     total_reads = args.n #TODO add argument COVERAGE
@@ -428,9 +454,6 @@ def readulator_digest_only(motif_dt, frag_len):
     '''
     process fastq sequences for digestion simulation only
     '''
-
-    print('\nreading fasta\n')
-
     with open(args.genome) as fasta,\
          open('digested_R1.txt', 'w') as r1,\
          open('digested_R2.txt', 'w') as r2:
@@ -439,22 +462,24 @@ def readulator_digest_only(motif_dt, frag_len):
             if line.startswith('>') and seq:
                 seq_ls = digest_seq(seq, motif_dt, frag_len)
                 seq_ls = second_digest(seq_ls, motif_dt, frag_len)
-                seq_ls = basic_simulate_length(seq_ls, chr_name)
-                basic_writer(seq_ls, r1, r2)
+                if len(seq_ls) > 0:
+                    seq_ls = basic_simulate_length(seq_ls, chr_name)
+                    basic_writer(seq_ls, r1, r2)
 
                 seq = ''
                 chr_name = line.rstrip()[1:].replace(' ', '_')
-                print(f'processing {chr_name}')
+                print(f'\nprocessing {chr_name}')
             elif line.startswith('>'):
                 chr_name = line.rstrip()[1:].replace(' ', '_')
-                print(f'processing {chr_name}')
+                print(f'\nprocessing {chr_name}')
             else:
                 seq += line.rstrip().upper()
 
         seq_ls = digest_seq(seq, motif_dt, frag_len)
         seq_ls = second_digest(seq_ls, motif_dt, frag_len)
-        seq_ls = basic_simulate_length(seq_ls, chr_name)
-        basic_writer(seq_ls, r1, r2)
+        if len(seq_ls) > 0:
+            seq_ls = basic_simulate_length(seq_ls, chr_name)
+            basic_writer(seq_ls, r1, r2)
 
 
 def basic_simulate_length(seq_ls, chr_name):
@@ -463,9 +488,7 @@ def basic_simulate_length(seq_ls, chr_name):
     df.sort_values(['length'], ascending=[True], inplace=True)
     df.reset_index(inplace=True, drop=True)
 
-    print(df)
-
-    df.to_csv('raw_digest_' + chr_name + '.csv', index=None) #TODO add option to write raw digests to file per file
+    df.to_csv('raw_digest_' + chr_name + '.csv', index=None, header=False) #TODO add option to write raw digests to file per file
 
     read_count = len(df) #TODO keep this in case you want to multiply to get coverage
     total_reads = args.n #TODO add argument COVERAGE
