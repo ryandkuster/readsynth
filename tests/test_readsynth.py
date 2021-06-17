@@ -3,15 +3,15 @@ import re
 import sys
 import os
 sys.path.append("../")
-#from readulator import orientation_test
+#from readsynth import orientation_test
 
 
 '''
 usage:
-python3 -m unittest test_readulator.py
+python3 -m unittest test_readsynth.py
 '''
 
-class TestReadulator(unittest.TestCase):
+class TestReadsynth(unittest.TestCase):
 
     def test_orientation_test_1(self):
         '''

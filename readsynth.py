@@ -164,7 +164,7 @@ begin main simulation
 '''
 
 
-def readulator_main(motif_dt, frag_len):
+def readsynth_main(motif_dt, frag_len):
     '''
     process fastq sequences as adapter-ligated fragments
     '''
@@ -450,7 +450,7 @@ begin simulation of restriction digests only
 '''
 
 
-def readulator_digest_only(motif_dt, frag_len):
+def readsynth_digest_only(motif_dt, frag_len):
     '''
     process fastq sequences for digestion simulation only
     '''
@@ -549,7 +549,7 @@ if __name__ == '__main__':
     frag_len = args.f if args.f else (args.mean + (6*args.sd))
 
     if args.t:
-        readulator_digest_only(motif_dt, frag_len)
+        readsynth_digest_only(motif_dt, frag_len)
         sys.exit()
 
     if args.r1 and not args.q1:
@@ -578,6 +578,6 @@ if __name__ == '__main__':
     if args.r2:
         open_fastq(args.r2)
 
-    readulator_main(motif_dt, frag_len)
+    readsynth_main(motif_dt, frag_len)
 
 
