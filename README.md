@@ -1,4 +1,4 @@
-## readulator
+## readsynth
 
 ### simulated reads formatting
 
