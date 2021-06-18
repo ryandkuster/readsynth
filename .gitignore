@@ -3,6 +3,7 @@
 *tiff
 /samples/*
 /tests/test_project*
-
+*swp
+/.vscode/*
 .DS_Store
 __pycache__/

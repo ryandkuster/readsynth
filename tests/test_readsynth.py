@@ -49,8 +49,7 @@ class TestReadsynth(unittest.TestCase):
 
 def orientation_test(seq, motif_dt1, motif_dt2):
     '''
-    this is a hacky way to test this function
-    but the original code uses several global variables
+    the original code uses several global variables
     that are not easily mocked in unittest
     '''
     for motif1, offset1 in motif_dt1.items():

@@ -1,5 +1,16 @@
 ## readsynth
 
+### code architecture
+what should the system do? (functional requirements)
+- digest input genomes or chromosomes into RAD libraries
+
+how should the system behave? (non-functional requirements)
+
+restrictions
+- timeframe
+- existing tools
+
+
 ### simulated reads formatting
 
 in each header, the following components may be useful for analysis:
