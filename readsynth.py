@@ -176,13 +176,14 @@ def readsynth_main(motif_dt, frag_len, proj):
             if line.startswith('>') and seq:
                 seq_ls = digest_seq(seq, motif_dt, frag_len)
                 seq_ls = second_digest(seq_ls, motif_dt, frag_len)
-                seq_ls, len_ls = simulate_adapters(seq_ls)
-                seq_ls = simulate_length(seq_ls, len_ls, chr_name, proj)
+                #TODO add simulate_adapters/simulate_lenght at the end
+                #seq_ls, len_ls = simulate_adapters(seq_ls)
+                #seq_ls = simulate_length(seq_ls, len_ls, chr_name, proj)
 
-                if args.r1:
-                    read_writer_samples(seq_ls, r1, r2, chr_name)
-                else:
-                    read_writer(seq_ls, r1, r2, chr_name)
+                #if args.r1:
+                #    read_writer_samples(seq_ls, r1, r2, chr_name)
+                #else:
+                #    read_writer(seq_ls, r1, r2, chr_name)
 
                 seq = ''
                 chr_name = line.rstrip()[1:].replace(' ', '_')
@@ -195,13 +196,14 @@ def readsynth_main(motif_dt, frag_len, proj):
 
         seq_ls = digest_seq(seq, motif_dt, frag_len)
         seq_ls = second_digest(seq_ls, motif_dt, frag_len)
-        seq_ls, len_ls = simulate_adapters(seq_ls)
-        seq_ls = simulate_length(seq_ls, len_ls, chr_name, proj)
+        #TODO add simulate_adapters/simulate_lenght at the end
+        #seq_ls, len_ls = simulate_adapters(seq_ls)
+        #seq_ls = simulate_length(seq_ls, len_ls, chr_name, proj)
 
-        if args.r1:
-            read_writer_samples(seq_ls, r1, r2, chr_name)
-        else:
-            read_writer(seq_ls, r1, r2, chr_name)
+        #if args.r1:
+        #    read_writer_samples(seq_ls, r1, r2, chr_name)
+        #else:
+        #    read_writer(seq_ls, r1, r2, chr_name)
 
 
 def digest_seq(seq, motif_dt, frag_len):
@@ -236,7 +238,6 @@ def reverse_comp(seq):
 
 def second_digest(seq_ls, motif_dt, frag_len):
     #TODO add test for empty lists
-    print('performing second digest')
     second_ls = []
     for seq in seq_ls:
         second_ls += digest_seq(seq, motif_dt, frag_len)
@@ -247,14 +248,12 @@ def second_digest(seq_ls, motif_dt, frag_len):
         second_ls = [i for i in second_ls if i]
 
     if args.complete == 1:
-        print('including only complete digests')
         second_ls = [complete_digest(i, motif_dt) for i in second_ls]
         second_ls = [i for i in second_ls if i]
 
     if len(second_ls) == 0:
         return second_ls
 
-    digest_stats(second_ls)
     return second_ls
 
 
@@ -291,10 +290,11 @@ def complete_digest(seq, motif_dt):
     return seq
 
 
-def digest_stats(seq_ls):
+def digest_stats(gen_ls):
     '''
     prints a histogram to screen for every input sequence
     '''
+    seq_ls = [seq[0] for seq in gen_ls]
     stats_dt = {}
     len_ls = [len(seq) for seq in seq_ls]
     for num in range(args.sd, max(max(len_ls), args.sd)+args.sd, args.sd):
@@ -460,41 +460,58 @@ def readsynth_digest_only(motif_dt, frag_len, proj):
     '''
     process fastq sequences for digestion simulation only
     '''
-    with open(args.genome) as fasta,\
-         open(os.path.join(proj, 'digested_R1.txt'), 'w') as r1,\
-         open(os.path.join(proj, 'digested_R2.txt'), 'w') as r2:
+    #TODO make fasta fasta_file pulled from directory walk
+    digest_file = os.path.join(proj, 'raw_digest_' + os.path.basename(args.genome) + '.csv')
+    with open(args.genome) as fasta, open(digest_file, 'w') as dfile:
+        gen_ls = []
         seq = ''
         for line in fasta:
             if line.startswith('>') and seq:
                 seq_ls = digest_seq(seq, motif_dt, frag_len)
                 seq_ls = second_digest(seq_ls, motif_dt, frag_len)
-                if len(seq_ls) > 0:
-                    seq_ls = basic_simulate_length(seq_ls, chr_name, proj)
-                    basic_writer(seq_ls, r1, r2)
-
+                gen_ls.extend([(i, len(i), chr_name) for i in seq_ls])
                 seq = ''
-                chr_name = line.rstrip()[1:].replace(' ', '_')
-                print(f'\nprocessing {chr_name}')
+                chr_name = line.rstrip()[1:].replace(' ', '_').replace(',','')
             elif line.startswith('>'):
-                chr_name = line.rstrip()[1:].replace(' ', '_')
-                print(f'\nprocessing {chr_name}')
+                chr_name = line.rstrip()[1:].replace(' ', '_').replace(',','')
             else:
                 seq += line.rstrip().upper()
 
         seq_ls = digest_seq(seq, motif_dt, frag_len)
         seq_ls = second_digest(seq_ls, motif_dt, frag_len)
-        if len(seq_ls) > 0:
-            seq_ls = basic_simulate_length(seq_ls, chr_name, proj)
-            basic_writer(seq_ls, r1, r2)
+        gen_ls.extend([(i, len(i), chr_name) for i in seq_ls])
+
+        if len(gen_ls) > 0:
+            digest_stats(gen_ls)
+            write_digested_reads(gen_ls, dfile)
+
+    save_histogram(proj, digest_file)
 
 
-def basic_simulate_length(seq_ls, chr_name, proj):
-    df = pd.DataFrame(seq_ls, columns = ['sequence'])
-    df['length'] = [len(i) for i in seq_ls]
+    #TODO make this a separate function
+    #with open(os.path.join(proj, 'digested_R1.txt'), 'w') as r1,\
+    #     open(os.path.join(proj, 'digested_R2.txt'), 'w') as r2:
+    #        seq_ls = basic_simulate_length(digest_file, proj)
+    #        basic_writer(seq_ls, r1, r2)
+
+
+def write_digested_reads(gen_ls, dfile):
+    for seq in gen_ls:
+        dfile.write(f'{seq[0]},{str(seq[1])},{seq[2]}\n')
+
+
+def save_histogram(proj, digest_file):
+    df = pd.read_csv(digest_file, names=['sequence', 'length', 'chr'])
+    ax = df['length'].hist(bins=100)
+    fig = ax.get_figure()
+    fig.savefig(os.path.join(proj, 'hist_' + os.path.basename(digest_file)[:-4] + '.pdf'))
+
+
+def basic_simulate_length(dfile, proj):
+    df = pd.read_csv(dfile, names=['sequence', 'length', 'chr'])
     df.sort_values(['length'], ascending=[True], inplace=True)
     df.reset_index(inplace=True, drop=True)
-
-    df.to_csv(os.path.join(proj, 'raw_digest_' + chr_name + '.csv'), index=None, header=False) #TODO add option to write raw digests to file per file
+    print(df)
 
     read_count = len(df) #TODO keep this in case you want to multiply to get coverage
     total_reads = args.n #TODO add argument COVERAGE
@@ -519,18 +536,11 @@ def basic_simulate_length(seq_ls, chr_name, proj):
         sampled_df = pd.concat([sampled_df, tmp_df])
 
     sampled_df['counts'] = counts
-
     index_names = sampled_df[sampled_df['counts'] == 0].index
     sampled_df.drop(index_names, inplace=True)
-
     sampled_df.reset_index(inplace=True, drop=True)
-
     sampled_df.to_csv(os.path.join(proj, 'sampled_df.csv'))
-
-    print(f'the length of sample_seqs is {len(sampled_df)}')
-    reads_to_write = sampled_df['counts'].sum()
-    print(f'writing {reads_to_write} simulated reads')
-
+    print(sampled_df)
     return sampled_df
 
 
