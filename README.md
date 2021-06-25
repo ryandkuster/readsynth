@@ -21,5 +21,5 @@ in each header, the following components may be useful for analysis:
 
 |@|62|47|138|34|CGAAGGTGAT|TGCCAAT|full_genome.fna|1|
 |:-|:-|:-|:-|:-|:---------|:------|:-------------|:-|
-|'@'|fastq index|index of 'sampled_df.csv'|length of sequence with fragment|length of fragment|R1 barcode|R2 barcode|fasta name|r1/r2 read|
+|'@'|fastq index|index of 'sampled_df.csv'|length of fragment with adapters|length of fragment|R1 barcode|R2 barcode|fasta name|r1/r2 read|
 
