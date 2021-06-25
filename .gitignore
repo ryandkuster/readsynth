@@ -5,5 +5,6 @@
 /tests/test_project*
 *swp
 /.vscode/*
+/.idea/*
 .DS_Store
 __pycache__/
