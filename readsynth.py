@@ -317,8 +317,7 @@ def write_digested_reads(gen_ls, dfile):
 
 
 def save_histogram(proj, digest_file):
-    col_names = ['seq', 'start', 'end', 'strand', 'length']
-    df = pd.read_csv(digest_file, names=col_names)
+    df = pd.read_csv(digest_file)
     ax = df['length'].hist(bins=100)
     fig = ax.get_figure()
     fig.savefig(os.path.join(proj, 'hist_' + os.path.basename(digest_file)[:-4] + '.pdf'))
@@ -403,13 +402,43 @@ def simulate_length(digest_file, proj):
     df.sort_values(['length'], ascending=[True], inplace=True)
     df.reset_index(inplace=True, drop=True)
 
-    total_reads = args.n #TODO add argument COVERAGE
-    draw_ls = np.random.normal(loc=args.mean,scale=args.sd,size=total_reads)
-    draw_ls = [round(i) for i in draw_ls]
-    draw_dt = {}
+    #TODO begin new feature
+    #TODO begin new feature
 
-    for i in range(max(min(df['length']), min(draw_ls)), min(max(df['length']), max(draw_ls))+1):
-        draw_dt[i] = draw_ls.count(i)
+    #total_reads = args.n #TODO add argument COVERAGE
+    #draw_ls = np.random.normal(loc=args.mean,scale=args.sd,size=total_reads)
+    #draw_ls = [round(i) for i in draw_ls]
+    #draw_dt = {}
+
+    # create draw_ls until mean + 2sd are not hindered by number of draws
+    # grow sample size by 10 percent each iteration
+
+    total_reads = 10
+    target = 2*args.sd
+    keep_going = True
+
+    while keep_going is True:
+        keep_going = False
+        draw_ls = np.random.normal(loc=args.mean,scale=args.sd,size=total_reads)
+        draw_ls = [round(i) for i in draw_ls]
+        for i in range(args.mean, args.mean + target):
+            len_count = df[df.length == i].shape[0]
+            if len_count > draw_ls.count(i):
+                total_reads = round(total_reads*1.1)
+                keep_going = True
+                break
+
+    #for i in range(max(min(df['length']), min(draw_ls)), min(max(df['length']), max(draw_ls))+1):
+    #    draw_dt[i] = draw_ls.count(i)
+
+    draw_dt = {}
+    for i in range(min(draw_ls), max(draw_ls)+1):
+        draw_counts = draw_ls.count(i)
+        data_counts = df[df.length == i].shape[0]
+        draw_dt[i] = min(draw_counts, data_counts)
+
+    #TODO end new feature
+    #TODO end new feature
 
     sampled_df = pd.DataFrame(columns=col_names)
     counts = []
@@ -429,6 +458,21 @@ def simulate_length(digest_file, proj):
     sampled_df.reset_index(inplace=True, drop=True)
     sampled_file = os.path.join(proj, 'sampled_' + os.path.basename(args.genome) + '.csv')
     sampled_df.to_csv(sampled_file, index=None)
+
+    #TODO start
+    #TODO start
+    histogram_seqs = pd.DataFrame(columns=['length'])
+    length_ls = []
+
+    for idx, row in sampled_df.iterrows():
+        length_ls.extend([row['length'] for i in range(row['counts'])])
+
+    histogram_seqs['length'] = length_ls
+    ax = histogram_seqs['length'].hist(bins=100)
+    fig = ax.get_figure()
+    fig.savefig(os.path.join(proj, 'hist_' + os.path.basename(sampled_file)[:-4] + '.pdf'))
+    #TODO end
+    #TODO end
 
     return sampled_df
 
