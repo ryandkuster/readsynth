@@ -10,8 +10,8 @@ import re
 import sys
 
 
+#TODO add feature where raw_digest file can be input from previous runs
 #TODO consider the possibility of stacked RE sites (e.g. ATGCATG has both ATGCAT and CATG sites...)
-#TODO consider removing l argument, as q scores are necessary
 #TODO automate detection of a1s/a2s? (find common adapter? assumes N composition of pos1...)
 #TODO check if genome compressed
 #TODO check if adapters contain RE motif offsets
@@ -39,7 +39,7 @@ def parse_user_input():
             help='test mode: create newline-separated file of RE digested sequences only')
 
     parser.add_argument('-n', type=int, required=True,
-            help='number of reads to simulate (currently per chromosome)')
+            help='genome copy (depth per locus)')
 
     parser.add_argument('-mean', type=int, required=True,
             help='mean (in bp) of read lengths after size selection')
@@ -58,6 +58,12 @@ def parse_user_input():
 
     parser.add_argument('-a2', type=str, required=False,
             help='file containing tab/space-separated adapters and barcode that attach 3\' to read')
+
+    parser.add_argument('-a1s', type=int, required=False,
+            help='manually provide bp length of adapter a1 before SBS begins')
+
+    parser.add_argument('-a2s', type=int, required=False,
+            help='manually provide bp length of adapter a1 before SBS begins')
 
     parser.add_argument('-q1', type=str, required=False,
             help='file containing R1 q scores in csv format (see ngsComposer tool crinoid)')
@@ -117,12 +123,18 @@ def get_adapters(arg):
             adapter, id = line.rstrip().split()
             adapters_dt[adapter] = id
 
-    sbs_start = get_sbs_start(list(adapters_dt.keys()))
-
-    return adapters_dt, sbs_start
+    return adapters_dt
 
 
 def get_sbs_start(adapter_ls):
+    """
+    if a1s/a2s not provided, an automated attempt to find the SBS start
+    site is performed by finding the first position where adapters
+    deviate in sequence
+    """
+    if len(adapter_ls) == 1:
+        return len(adapter_ls[0])
+
     for idx, pos in enumerate(adapter_ls[0]):
         for seq in adapter_ls:
             if adapter_ls[0][:idx] not in seq:
@@ -339,8 +351,10 @@ def size_selection(proj, digest_file):
 
         if args.r1:
             read_writer_samples(sampled_df, r1, r2)
-        else:
+        elif args.q1:
             read_writer(sampled_df, r1, r2)
+        else:
+            read_writer_basic(sampled_df, r1, r2)
 
 
 def simulate_adapters(digest_file):
@@ -402,17 +416,6 @@ def simulate_length(digest_file, proj):
     df.sort_values(['length'], ascending=[True], inplace=True)
     df.reset_index(inplace=True, drop=True)
 
-    #TODO begin new feature
-    #TODO begin new feature
-
-    #total_reads = args.n #TODO add argument COVERAGE
-    #draw_ls = np.random.normal(loc=args.mean,scale=args.sd,size=total_reads)
-    #draw_ls = [round(i) for i in draw_ls]
-    #draw_dt = {}
-
-    # create draw_ls until mean + 2sd are not hindered by number of draws
-    # grow sample size by 10 percent each iteration
-
     total_reads = 10
     target = 2*args.sd
     keep_going = True
@@ -422,23 +425,17 @@ def simulate_length(digest_file, proj):
         draw_ls = np.random.normal(loc=args.mean,scale=args.sd,size=total_reads)
         draw_ls = [round(i) for i in draw_ls]
         for i in range(args.mean, args.mean + target):
-            len_count = df[df.length == i].shape[0]
+            len_count = df[(df.length == i) & (df.strand == '+')].shape[0]
             if len_count > draw_ls.count(i):
                 total_reads = round(total_reads*1.1)
                 keep_going = True
                 break
 
-    #for i in range(max(min(df['length']), min(draw_ls)), min(max(df['length']), max(draw_ls))+1):
-    #    draw_dt[i] = draw_ls.count(i)
-
     draw_dt = {}
     for i in range(min(draw_ls), max(draw_ls)+1):
         draw_counts = draw_ls.count(i)
         data_counts = df[df.length == i].shape[0]
-        draw_dt[i] = min(draw_counts, data_counts)
-
-    #TODO end new feature
-    #TODO end new feature
+        draw_dt[i] = min(draw_counts, data_counts) * args.n
 
     sampled_df = pd.DataFrame(columns=col_names)
     counts = []
@@ -459,8 +456,7 @@ def simulate_length(digest_file, proj):
     sampled_file = os.path.join(proj, 'sampled_' + os.path.basename(args.genome) + '.csv')
     sampled_df.to_csv(sampled_file, index=None)
 
-    #TODO start
-    #TODO start
+    #TODO start testing visual
     histogram_seqs = pd.DataFrame(columns=['length'])
     length_ls = []
 
@@ -471,8 +467,7 @@ def simulate_length(digest_file, proj):
     ax = histogram_seqs['length'].hist(bins=100)
     fig = ax.get_figure()
     fig.savefig(os.path.join(proj, 'hist_' + os.path.basename(sampled_file)[:-4] + '.pdf'))
-    #TODO end
-    #TODO end
+    #TODO end testing visual
 
     return sampled_df
 
@@ -552,6 +547,27 @@ def read_mutator_samples(seq, scores_dt, sampled_q):
     return mut_seq, score
 
 
+def read_writer_basic(sampled_df, r1, r2):
+    """
+    create a fastq-formatted output with no attempt at error profiling
+
+    args.a1s is where to begin in the R1 adapter
+    args.a2s is where to begin in the R2 adapter
+    """
+    gen_name = os.path.basename(args.genome)
+    id = 0
+    for idx, row in sampled_df.iterrows():
+        r1_seq = row['seq'][args.a1s:args.a1s+args.l].ljust(args.l, 'G')
+        r2_seq = reverse_comp(row['seq'])[args.a2s:args.a2s+args.l].ljust(args.l, 'G')
+        score = 'I' * args.l
+        for count in range(row['counts']):
+            r1.write(f'@{id}:{idx}:{row[5]}:{row[4]}:{row[6]}:{row[7]}:' \
+                    f'{gen_name} 1\n{r1_seq}\n+\n{score}\n')
+            r2.write(f'@{id}:{idx}:{row[5]}:{row[4]}:{row[6]}:{row[7]}:' \
+                    f'{gen_name} 2\n{r2_seq}\n+\n{score}\n')
+            id += 1
+
+
 if __name__ == '__main__':
     args = parse_user_input()
 
@@ -578,11 +594,15 @@ if __name__ == '__main__':
     args.l = args.l if args.l else 250
 
     if args.a1:
-        args.a1, args.a1s = get_adapters(args.a1)
+        args.a1 = get_adapters(args.a1)
+        if not args.a1s:
+            args.a1s = get_sbs_start(list(args.a1.keys()))
 
     if args.a2:
-        args.a2, args.a2s = get_adapters(args.a2)
+        args.a2 = get_adapters(args.a2)
         args.a2 = {reverse_comp(adapter): id for adapter, id in args.a2.items()}
+        if not args.a2s:
+            args.a2s = get_sbs_start(list(args.a2.keys()))
 
     if args.q1:
         args.prob_mx1, args.q_dt1, args.q_ls1 = get_qscores(args.q1)
@@ -601,6 +621,4 @@ if __name__ == '__main__':
     digest_file = digest_genome(motif_dt, frag_len, proj)
     save_histogram(proj, digest_file)
     size_selection(proj, digest_file)
-
-
 

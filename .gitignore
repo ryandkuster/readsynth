@@ -1,7 +1,7 @@
 /raw_data/*
+!/raw_data/adapters/
 *fastq
 *tiff
-/samples/*
 /tests/test_project*
 *swp
 /.vscode/*
