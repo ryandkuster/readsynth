@@ -346,8 +346,8 @@ def size_selection(proj, digest_file):
     if args.t:
         sys.exit()
 
-    with open(os.path.join(proj, 'digested_R1.txt'), 'w') as r1,\
-         open(os.path.join(proj, 'digested_R2.txt'), 'w') as r2:
+    with open(os.path.join(proj, os.path.basename(args.genome) + '_R1.fastq'), 'w') as r1,\
+         open(os.path.join(proj, os.path.basename(args.genome) + '_R2.fastq'), 'w') as r2:
 
         if args.r1:
             read_writer_samples(sampled_df, r1, r2)
