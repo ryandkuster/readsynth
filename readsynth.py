@@ -381,7 +381,7 @@ def simulate_adapters(digest_file):
         lig_len_ls.append(len(ligated_seq))
 
     df['seq'] = lig_seq_ls
-    df['length_w_adapter'] = lig_len_ls
+    df['full_length'] = lig_len_ls
     df['r1_id'] = r1_ls
     df['r2_id'] = r2_ls
 
@@ -397,7 +397,7 @@ def no_adapters(digest_file):
     adjust df for lack of adapters
     """
     df = pd.read_csv(digest_file)
-    df['length_w_adapter'] = df['length']
+    df['full_length'] = df['length']
     df['r1_id'] = ['na' for i in df['seq']]
     df['r2_id'] = ['na' for i in df['seq']]
 
@@ -413,7 +413,7 @@ def simulate_length(digest_file, proj):
     """
     df = pd.read_csv(digest_file)
     col_names = [col for col in df.columns]
-    df.sort_values(['length'], ascending=[True], inplace=True)
+    df.sort_values(['full_length'], ascending=[True], inplace=True)
     df.reset_index(inplace=True, drop=True)
 
     total_reads = 10
@@ -425,7 +425,7 @@ def simulate_length(digest_file, proj):
         draw_ls = np.random.normal(loc=args.mean,scale=args.sd,size=total_reads)
         draw_ls = [round(i) for i in draw_ls]
         for i in range(args.mean, args.mean + target):
-            len_count = df[(df.length == i) & (df.strand == '+')].shape[0]
+            len_count = df[(df.full_length == i) & (df.strand == '+')].shape[0]
             if len_count > draw_ls.count(i):
                 total_reads = round(total_reads*1.1)
                 keep_going = True
@@ -434,14 +434,14 @@ def simulate_length(digest_file, proj):
     draw_dt = {}
     for i in range(min(draw_ls), max(draw_ls)+1):
         draw_counts = draw_ls.count(i)
-        data_counts = df[df.length == i].shape[0]
+        data_counts = df[df.full_length == i].shape[0]
         draw_dt[i] = min(draw_counts, data_counts) * args.n
 
     sampled_df = pd.DataFrame(columns=col_names)
     counts = []
 
     for length, draws in draw_dt.items():
-        tmp_df =  df.loc[df['length'] == length]
+        tmp_df =  df.loc[df['full_length'] == length]
         if len(tmp_df) == 0:
             continue
         indices = [i for i in range(len(tmp_df))]
@@ -457,14 +457,14 @@ def simulate_length(digest_file, proj):
     sampled_df.to_csv(sampled_file, index=None)
 
     #TODO start testing visual
-    histogram_seqs = pd.DataFrame(columns=['length'])
+    histogram_seqs = pd.DataFrame(columns=['full_length'])
     length_ls = []
 
     for idx, row in sampled_df.iterrows():
-        length_ls.extend([row['length'] for i in range(row['counts'])])
+        length_ls.extend([row['full_length'] for i in range(row['counts'])])
 
-    histogram_seqs['length'] = length_ls
-    ax = histogram_seqs['length'].hist(bins=100)
+    histogram_seqs['full_length'] = length_ls
+    ax = histogram_seqs['full_length'].hist(bins=100)
     fig = ax.get_figure()
     fig.savefig(os.path.join(proj, 'hist_' + os.path.basename(sampled_file)[:-4] + '.pdf'))
     #TODO end testing visual
