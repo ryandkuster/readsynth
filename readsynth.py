@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 import argparse
+import gzip
 import math
 import numpy as np
 import os
@@ -9,10 +10,7 @@ import random
 import re
 import sys
 
-
-#TODO add feature where raw_digest file can be input from previous runs
-#TODO check if genome compressed
-#TODO check if adapters contain RE motif offsets
+from scripts.gzip_test import test_unicode
 
 
 def parse_user_input():
@@ -179,31 +177,41 @@ def digest_genome(motif_dt, frag_len, proj):
     output 'raw_digest' file holds all the resulting fragments
     """
     digest_file = os.path.join(proj, 'raw_digest_' + os.path.basename(args.genome) + '.csv')
-    with open(args.genome) as fasta, open(digest_file, 'w') as dfile:
-        dfile.write('seq,start,end,strand,length\n')
-        begin = 0
-        gen_ls = []
-        seq = ''
-        for line in fasta:
-            if line.startswith('>') and seq:
-                seq_ls = digest_seq(begin, seq, motif_dt, frag_len)
-                seq_ls = second_digest(seq_ls, motif_dt, frag_len)
-                gen_ls.extend([i+[len(i[0])] for i in seq_ls])
-                begin += len(seq)
-                seq = ''
-                chr_name = line.rstrip()[1:].replace(' ', '_').replace(',','')
-            elif line.startswith('>'):
-                chr_name = line.rstrip()[1:].replace(' ', '_').replace(',','')
-            else:
-                seq += line.rstrip().upper()
+    dfile = open(digest_file, 'w')
+    dfile.write('seq,start,end,strand,length\n')
 
-        seq_ls = digest_seq(begin, seq, motif_dt, frag_len)
-        seq_ls = second_digest(seq_ls, motif_dt, frag_len)
-        gen_ls.extend([i+[len(i[0])] for i in seq_ls])
+    if test_unicode(args.genome):
+        fasta = gzip.open(args.genome, 'rt')
+    else:
+        fasta = open(args.genome)
 
-        if len(gen_ls) > 0:
-            digest_stats(gen_ls)
-            write_digested_reads(gen_ls, dfile)
+    begin = 0
+    gen_ls = []
+    seq = ''
+    for line in fasta:
+        if line.startswith('>') and seq:
+            seq_ls = digest_seq(begin, seq, motif_dt, frag_len)
+            seq_ls = second_digest(seq_ls, motif_dt, frag_len)
+            gen_ls.extend([i+[len(i[0])] for i in seq_ls])
+            begin += len(seq)
+            seq = ''
+            chr_name = line.rstrip()[1:].replace(' ', '_').replace(',','')
+        elif line.startswith('>'):
+            chr_name = line.rstrip()[1:].replace(' ', '_').replace(',','')
+        else:
+            seq += line.rstrip().upper()
+
+    seq_ls = digest_seq(begin, seq, motif_dt, frag_len)
+    seq_ls = second_digest(seq_ls, motif_dt, frag_len)
+    gen_ls.extend([i+[len(i[0])] for i in seq_ls])
+    begin += len(seq)
+
+    if len(gen_ls) > 0:
+        digest_stats(gen_ls, begin)
+        write_digested_reads(gen_ls, dfile)
+
+    dfile.close()
+    fasta.close()
 
     return digest_file
 
@@ -291,7 +299,7 @@ def complete_digest(seq, motif_dt):
     return seq
 
 
-def digest_stats(gen_ls):
+def digest_stats(gen_ls, begin):
     """
     prints a histogram to screen for every input sequence
     """
@@ -301,7 +309,8 @@ def digest_stats(gen_ls):
     for num in range(args.sd, max(max(len_ls), args.sd)+args.sd, args.sd):
         stats_dt[int(math.ceil(num / 10.0)) * 10] = 0
 
-    print(f'average fragment length: {round(sum(map(len, seq_ls)) / len(seq_ls), 2)}')
+    print(f'input genome length: {begin} bp')
+    print(f'average fragment length: {round(sum(map(len, seq_ls)) / len(seq_ls), 2)} bp')
     print(f'number of fragments: {len(seq_ls)}')
 
     col, row = os.get_terminal_size()
@@ -332,8 +341,10 @@ def add_position_weights(digest_file):
     df = pd.read_csv(digest_file)
     pos_dt = count_pos(df)
     weight_ls = add_pos_weight(pos_dt, df)
-    print(str(sum(weight_ls))) #TODO
+    print(f'positions covered: {len(pos_dt)}')
     df['weight'] = weight_ls
+    results = sum([i*j for (i,j) in zip(df['weight'],df['length'])])
+    print(f'sum of bp weights: {len(pos_dt)}')
     df.to_csv(digest_file, index=None)
 
 
@@ -403,7 +414,6 @@ def size_selection(proj, digest_file):
 
 
 def simulate_adapters(digest_file):
-    #TODO make draw_ls reflect fragment 'collision' (same locus)
     """
     simulate ligation of adapters to sequences
 
@@ -677,10 +687,11 @@ if __name__ == '__main__':
     if args.r2:
         open_fastq(args.r2)
 
+    print('\nsimulating restriction digest\n')
     digest_file = digest_genome(motif_dt, frag_len, proj)
     save_histogram(proj, digest_file)
-    print('weights')
+    print('\ncalculating per base weights\n')
     add_position_weights(digest_file)
-    print('weights complete')
+    print('\nsimulating size selection\n')
     size_selection(proj, digest_file)
 
