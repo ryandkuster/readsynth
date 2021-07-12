@@ -383,7 +383,7 @@ def save_histogram(proj, digest_file):
     df = pd.read_csv(digest_file)
     ax = df['length'].hist(bins=100, range=[0, args.f])
     fig = ax.get_figure()
-    fig.savefig(os.path.join(proj, 'hist_' + os.path.basename(digest_file)[:-4] + '.pdf'))
+    fig.savefig(os.path.join(proj, 'hist_' + os.path.basename(digest_file)[:-4] + '.png'))
 
 
 def size_selection(proj, digest_file):
@@ -536,7 +536,7 @@ def simulate_length(digest_file, proj):
     histogram_seqs['full_length'] = length_ls
     ax = histogram_seqs['full_length'].hist(bins=100, range=[0, args.f])
     fig = ax.get_figure()
-    fig.savefig(os.path.join(proj, 'hist_' + os.path.basename(sampled_file)[:-4] + '.pdf'))
+    fig.savefig(os.path.join(proj, 'hist_' + os.path.basename(sampled_file)[:-4] + '.png'))
     #TODO end testing visual
 
     return sampled_df
@@ -583,8 +583,10 @@ def read_writer_samples(sampled_df, r1, r2):
     args.a1s is where to begin in the R1 adapter
     args.a2s is where to begin in the R2 adapter
     """
-    sampled_q1 = list(pd.read_csv(args.r1 + '_sampled_scores.csv', names=['score'])['score'].values)
-    sampled_q2 = list(pd.read_csv(args.r2 + '_sampled_scores.csv', names=['score'])['score'].values)
+    sampled_q1 = pd.read_csv(args.r1 + '_sampled_scores.csv', names=['score'], sep = '\t')
+    sampled_q2 = pd.read_csv(args.r2 + '_sampled_scores.csv', names=['score'], sep = '\t')
+    sampled_q1 = list(sampled_q1['score'].values)
+    sampled_q2 = list(sampled_q2['score'].values)
     args.l = len(max(sampled_q1, key=len))
     gen_name = os.path.basename(args.genome)
     id = 0
