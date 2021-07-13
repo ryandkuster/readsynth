@@ -354,8 +354,8 @@ def count_pos(df):
     counts of fragments mapping to those loci
     """
     pos_dt = {}
-    for idx, row in df.iterrows():
-        for i in range(row['start'], row['end']):
+    for start, end in zip(df['start'], df['end']):
+        for i in range(start, end):
             if i in pos_dt:
                 pos_dt[i] += 1
             else:
@@ -483,9 +483,16 @@ def simulate_length(digest_file, proj):
     keep_going = True
     len_dt = {}
 
+    # create a len_dt, storing the weight-adjusted count for each length
     for i in range(args.mean, args.mean + 2*args.sd):
         len_count = df[df.full_length == i]['weight'].sum()
         len_dt[i] = len_count
+
+##TODO
+#    for k, v in len_dt.items():
+#        if v > 0:
+#            print(str(k), round(v*0.02)*'-')
+##TODO
 
     # produce a normal distribution that includes mean + 2sd counts
     while keep_going is True:
@@ -500,18 +507,18 @@ def simulate_length(digest_file, proj):
 
     # create a dictionary of draw numbers
     draw_dt = {}
+
     for i in range(min(draw_ls), max(draw_ls)+1):
-        draw_counts = draw_ls.count(i)
-        #data_counts = df[df.full_length == i].shape[0]
-        data_counts = round(df[df.full_length == i]['weight'].sum())
-        draw_dt[i] = min(draw_counts, data_counts) * args.n
+        draw_counts = draw_ls.count(i) * args.n
+        data_counts = round(df[df.full_length == i]['weight'].sum() * args.n)
+        draw_dt[i] = min(draw_counts, data_counts)
 
     # for each fragment length, randomly draw reads
     sampled_df = pd.DataFrame(columns=col_names)
     counts = []
 
     for length, draws in draw_dt.items():
-        tmp_df =  df.loc[df['full_length'] == length]
+        tmp_df = df.loc[df['full_length'] == length]
         if len(tmp_df) == 0:
             continue
         indices = [i for i in range(len(tmp_df))]
@@ -522,6 +529,8 @@ def simulate_length(digest_file, proj):
     sampled_df['counts'] = counts
     index_names = sampled_df[sampled_df['counts'] == 0].index
     sampled_df.drop(index_names, inplace=True)
+    samp_no = sampled_df['counts'].sum()
+    print(f'fragments sampled around mean of {args.mean}bp : {samp_no}')
     sampled_df.reset_index(inplace=True, drop=True)
     sampled_file = os.path.join(proj, 'sampled_' + os.path.basename(args.genome) + '.csv')
     sampled_df.to_csv(sampled_file, index=None)
