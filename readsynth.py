@@ -281,6 +281,8 @@ def orientation_test(seq, start, end, strand):
                     end -= len(motif2)-offset2
                     if offset2 == 0:
                         return [seq[offset1:], start, end, strand]
+                    elif len(motif2) == offset2:
+                        return [seq[offset1:], start, end, strand]
                     else:
                         return [seq[offset1:-(len(motif2)-offset2)], start, end, strand]
 
@@ -488,12 +490,6 @@ def simulate_length(digest_file, proj):
         len_count = df[df.full_length == i]['weight'].sum()
         len_dt[i] = len_count
 
-##TODO
-#    for k, v in len_dt.items():
-#        if v > 0:
-#            print(str(k), round(v*0.02)*'-')
-##TODO
-
     # produce a normal distribution that includes mean + 2sd counts
     while keep_going is True:
         keep_going = False
@@ -546,6 +542,7 @@ def simulate_length(digest_file, proj):
     ax = histogram_seqs['full_length'].hist(bins=100, range=[0, args.f])
     fig = ax.get_figure()
     fig.savefig(os.path.join(proj, 'hist_' + os.path.basename(sampled_file)[:-4] + '.png'))
+
     #TODO end testing visual
 
     return sampled_df
