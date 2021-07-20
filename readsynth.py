@@ -10,6 +10,10 @@ import random
 import re
 import sys
 
+import partial_digest as pard
+
+from functools import partial
+from multiprocessing import Pool
 from scripts.gzip_test import test_unicode
 
 
@@ -31,8 +35,11 @@ def parse_user_input():
     parser.add_argument('-l', type=int, required=False,
             help='desired read length of final simulated reads (defaults to 250 or given q1/q2 profiles)')
 
-    parser.add_argument('-t', type=str, required=False,
+    parser.add_argument('-test', dest='test', action='store_true',
             help='test mode: create newline-separated file of RE digested sequences only')
+
+    parser.add_argument('-t', type=int, required=False,
+            help='number of subprocesses to run while simulating copy number')
 
     parser.add_argument('-n', type=int, required=True,
             help='genome copy (depth per locus)')
@@ -43,11 +50,14 @@ def parse_user_input():
     parser.add_argument('-sd', type=int, required=True,
             help='standard deviation (in bp) of read lengths after size selection')
 
-    parser.add_argument('-f', type=int, required=False,
+    parser.add_argument('-min', type=int, required=False,
+            help='min distance between cuts (optional, defaults to 6bp)')
+
+    parser.add_argument('-max', type=int, required=False,
             help='max fragment length after first cut (optional, defaults to mean + 6 stdevs)')
 
-    parser.add_argument('-complete', type=int, required=False,
-            help='use \'1\' for complete digestion of fragments (fragments will not contain internal RE sites)')
+    parser.add_argument('-complete', type=float, required=True,
+            help='percent probability of per-site cut; use \'1\' for complete digestion of fragments (fragments will not contain internal RE sites)')
 
     parser.add_argument('-a1', type=str, required=False,
             help='file containing tab/space-separated adapters and barcode that attach 5\' to read')
@@ -230,7 +240,9 @@ def digest_seq(begin, seq, motif_dt, frag_len):
             end = start + frag_len
             fragment = seq[start:end]
             if fragment not in motif_dt:
-                seq_ls.append([fragment, begin+start, begin+(len(fragment)+start)])
+                seq_ls.append([fragment,
+                               begin+start,
+                               begin+start+len(fragment)])
 
     return [[reverse_comp(i[0]), i[1], i[2]] for i in seq_ls]
 
@@ -250,7 +262,6 @@ def second_digest(seq_ls, motif_dt, frag_len):
         subseqs = digest_seq(0, i[0], motif_dt, frag_len)
         subseqs = [[j[0], i[1], i[2]-j[1], '+'] for j in subseqs]
         second_ls += subseqs
-
     second_ls += [[reverse_comp(i[0]), i[1], i[2], '-'] for i in second_ls]
     second_ls = [orientation_test(*i) for i in second_ls]
     second_ls = [i for i in second_ls if i[0]]
@@ -277,11 +288,10 @@ def orientation_test(seq, start, end, strand):
         if re.search('^'+motif1, seq):
             for motif2, offset2 in motif_dt2.items():
                 if re.search(motif2+'$', seq):
-                    start += offset1
-                    end -= len(motif2)-offset2
-                    if offset2 == 0:
-                        return [seq[offset1:], start, end, strand]
-                    elif len(motif2) == offset2:
+                    #start += offset1
+                    #end -= len(motif2)-offset2
+                    end = end - len(motif2) if strand == '+' else end - len(motif1)
+                    if offset2 == 0 or len(motif2) == offset2:
                         return [seq[offset1:], start, end, strand]
                     else:
                         return [seq[offset1:-(len(motif2)-offset2)], start, end, strand]
@@ -333,59 +343,28 @@ def write_digested_reads(gen_ls, dfile):
         dfile.write(f'{i[0]},{str(i[1])},{str(i[2])},{i[3]},{str(i[4])}\n')
 
 
-def add_position_weights(digest_file):
-    """
-    using the start and end position for all fragments, create a
-    per-fragment weight that accounts for multiple fragments mapping to
-    the same locus (can occur due to incomplete digest or nesting RE
-    motifs or fragments that occur in the template and reverse template
-    """
-    df = pd.read_csv(digest_file)
-    pos_dt = count_pos(df)
-    weight_ls = add_pos_weight(pos_dt, df)
-    print(f'positions covered: {len(pos_dt)}')
-    df['weight'] = weight_ls
-    results = sum([i*j for (i,j) in zip(df['weight'],df['length'])])
-    print(f'sum of bp weights: {len(pos_dt)}')
-    df.to_csv(digest_file, index=None)
-
-
-def count_pos(df):
-    """
-    create a dictionary where keys are genomic loci and values are
-    counts of fragments mapping to those loci
-    """
-    pos_dt = {}
-    for start, end in zip(df['start'], df['end']):
-        for i in range(start, end):
-            if i in pos_dt:
-                pos_dt[i] += 1
-            else:
-                pos_dt[i] = 1
-    return pos_dt
-
-
-def add_pos_weight(pos_dt, df):
-    """
-    iterate through the sequence start and end sites and sum the bases
-    where multiple reads are present; divide fragment length by this
-    sum to create a position-specific weight
-    """
-    weight_ls = []
-    for idx, row in df.iterrows():
-        frag_total = 0
-        for i in range(row['start'], row['end']):
-            frag_total += pos_dt[i]
-        weight_ls.append(row['length']/frag_total)
-
-    return weight_ls
-
-
 def save_histogram(proj, digest_file):
     df = pd.read_csv(digest_file)
-    ax = df['length'].hist(bins=100, range=[0, args.f])
+    ax = df['length'].hist(bins=100, range=[0, args.max])
     fig = ax.get_figure()
     fig.savefig(os.path.join(proj, 'hist_' + os.path.basename(digest_file)[:-4] + '.png'))
+
+
+def duplicate_fragments(proj, digest_file):
+    df = pd.read_csv(digest_file)
+    pool = Pool(args.t)
+    pool_ls = [i+1 for i in range(args.n)]
+    pool_part = partial(pard.incomplete_digest, df, args.max, args.complete, args.min)
+    indices = pool.map(pool_part, pool_ls)
+    pool.close
+    copy_df = pd.DataFrame()
+
+    for i in indices:
+        copy_df = pd.concat([copy_df, df.iloc[i]])
+    dup_file = os.path.join(proj, 'copies_' + os.path.basename(args.genome    ) + '.csv')
+    copy_df.to_csv(dup_file, index=None)
+
+    return dup_file
 
 
 def size_selection(proj, digest_file):
@@ -401,8 +380,10 @@ def size_selection(proj, digest_file):
 
     sampled_df = simulate_length(digest_file, proj)
 
-    if args.t:
+    if args.test:
         sys.exit()
+    elif not args.a1s:
+        args.a1s, args.a2s = 0, 0
 
     with open(os.path.join(proj, os.path.basename(args.genome) + '_R1.fastq'), 'w') as r1,\
          open(os.path.join(proj, os.path.basename(args.genome) + '_R2.fastq'), 'w') as r2:
@@ -444,7 +425,7 @@ def simulate_adapters(digest_file):
 
     adapt_file = os.path.join(proj, 'adapt_' + os.path.basename(args.genome) + '.csv')
 
-    df = df[['seq','start','end','strand','length','full_length','r1_id','r2_id','weight']]
+    df = df[['seq','start','end','strand','length','full_length','r1_id','r2_id']]
     df.to_csv(adapt_file, index=None)
 
     return adapt_file
@@ -459,7 +440,7 @@ def no_adapters(digest_file):
     df['r1_id'] = ['na' for i in df['seq']]
     df['r2_id'] = ['na' for i in df['seq']]
 
-    df = df[['seq','start','end','strand','length','full_length','r1_id','r2_id','weight']]
+    df = df[['seq','start','end','strand','length','full_length','r1_id','r2_id']]
     df.to_csv(digest_file, index=None)
 
     return digest_file
@@ -471,24 +452,19 @@ def simulate_length(digest_file, proj):
     each possible read length and then generating a normal distribution
     that includes enough counts in the mean+2sd range to include a 1X
     coverage of the genome
-
-    this random sampling distribution is then multiplied by args.n to
-    create nX coverage that roughly reflects size selection in molecular
-    library prep
     """
     df = pd.read_csv(digest_file)
     col_names = [col for col in df.columns]
     df.sort_values(['full_length'], ascending=[True], inplace=True)
     df.reset_index(inplace=True, drop=True)
 
-    total_reads = 10
-    keep_going = True
+    # create a len_dt, storing the count for each length
     len_dt = {}
-
-    # create a len_dt, storing the weight-adjusted count for each length
     for i in range(args.mean, args.mean + 2*args.sd):
-        len_count = df[df.full_length == i]['weight'].sum()
-        len_dt[i] = len_count
+        len_dt[i] = len(df[df.full_length == i])
+
+    total_reads = sum(len_dt.values())
+    keep_going = True
 
     # produce a normal distribution that includes mean + 2sd counts
     while keep_going is True:
@@ -505,8 +481,8 @@ def simulate_length(digest_file, proj):
     draw_dt = {}
 
     for i in range(min(draw_ls), max(draw_ls)+1):
-        draw_counts = draw_ls.count(i) * args.n
-        data_counts = round(df[df.full_length == i]['weight'].sum() * args.n)
+        draw_counts = draw_ls.count(i)
+        data_counts = df[df.full_length == i].shape[0]
         draw_dt[i] = min(draw_counts, data_counts)
 
     # for each fragment length, randomly draw reads
@@ -539,7 +515,7 @@ def simulate_length(digest_file, proj):
         length_ls.extend([row['full_length'] for i in range(row['counts'])])
 
     histogram_seqs['full_length'] = length_ls
-    ax = histogram_seqs['full_length'].hist(bins=100, range=[0, args.f])
+    ax = histogram_seqs['full_length'].hist(bins=100, range=[0, args.max])
     fig = ax.get_figure()
     fig.savefig(os.path.join(proj, 'hist_' + os.path.basename(sampled_file)[:-4] + '.png'))
 
@@ -562,9 +538,9 @@ def read_writer(sampled_df, r1, r2):
             r1_mut, r1_score = read_mutator(r1_seq, args.prob_mx1, args.q_dt1, args.q_ls1)
             r2_mut, r2_score = read_mutator(r2_seq, args.prob_mx2, args.q_dt2, args.q_ls2)
             r1.write(f'@{id}:{idx}:{row[5]}:{row[4]}:{row[6]}:{row[7]}:' \
-                    f'{gen_name} 1\n{r1_mut}\n+\n{r1_score}\n')
+                     f'{gen_name} 1\n{r1_mut}\n+\n{r1_score}\n')
             r2.write(f'@{id}:{idx}:{row[5]}:{row[4]}:{row[6]}:{row[7]}:' \
-                    f'{gen_name} 2\n{r2_mut}\n+\n{r2_score}\n')
+                     f'{gen_name} 2\n{r2_mut}\n+\n{r2_score}\n')
             id += 1
 
 
@@ -603,10 +579,12 @@ def read_writer_samples(sampled_df, r1, r2):
             r1_mut, r1_score = read_mutator_samples(r1_seq, args.q_dt1, sampled_q1)
             r2_mut, r2_score = read_mutator_samples(r2_seq, args.q_dt2, sampled_q2)
             r1.write(f'@{id}:{idx}:{row[5]}:{row[4]}:{row[6]}:{row[7]}:' \
-                    f'{gen_name} 1\n{r1_mut}\n+\n{r1_score}\n')
+                     f'{gen_name} 1\n{r1_mut}\n+\n{r1_score}\n')
             r2.write(f'@{id}:{idx}:{row[5]}:{row[4]}:{row[6]}:{row[7]}:' \
-                    f'{gen_name} 2\n{r2_mut}\n+\n{r2_score}\n')
+                     f'{gen_name} 2\n{r2_mut}\n+\n{r2_score}\n')
             id += 1
+
+
 
 
 def read_mutator_samples(seq, scores_dt, sampled_q):
@@ -634,15 +612,15 @@ def read_writer_basic(sampled_df, r1, r2):
     """
     gen_name = os.path.basename(args.genome)
     id = 0
+    score = 'I' * args.l
     for idx, row in sampled_df.iterrows():
         r1_seq = row['seq'][args.a1s:args.a1s+args.l].ljust(args.l, 'G')
         r2_seq = reverse_comp(row['seq'])[args.a2s:args.a2s+args.l].ljust(args.l, 'G')
-        score = 'I' * args.l
         for count in range(row['counts']):
             r1.write(f'@{id}:{idx}:{row[5]}:{row[4]}:{row[6]}:{row[7]}:' \
-                    f'{gen_name} 1\n{r1_seq}\n+\n{score}\n')
+                     f'{gen_name} 1\n{r1_seq}\n+\n{score}\n')
             r2.write(f'@{id}:{idx}:{row[5]}:{row[4]}:{row[6]}:{row[7]}:' \
-                    f'{gen_name} 2\n{r2_seq}\n+\n{score}\n')
+                     f'{gen_name} 2\n{r2_seq}\n+\n{score}\n')
             id += 1
 
 
@@ -662,8 +640,10 @@ if __name__ == '__main__':
     motif_dt2 = iupac_motifs(args.m2)
     motif_dt.update(motif_dt2)
 
-    args.f = args.f if args.f else (args.mean + (6*args.sd))
-    frag_len = args.f
+    args.t = args.t if args.t else 1
+    args.min = args.min if args.min else 6
+    args.max = args.max if args.max else (args.mean + (6*args.sd))
+    frag_len = args.max
 
     if args.r1 and not args.q1:
         sys.exit('please provide q scores profile for R1')
@@ -698,8 +678,11 @@ if __name__ == '__main__':
     print('\nsimulating restriction digest\n')
     digest_file = digest_genome(motif_dt, frag_len, proj)
     save_histogram(proj, digest_file)
-    print('\ncalculating per base weights\n')
-    add_position_weights(digest_file)
+
+    print('\nsimulating genome copy number\n')
+    digest_file = duplicate_fragments(proj, digest_file)
+    save_histogram(proj, digest_file)
+
     print('\nsimulating size selection\n')
     size_selection(proj, digest_file)
 
