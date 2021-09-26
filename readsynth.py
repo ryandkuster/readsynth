@@ -9,6 +9,7 @@ import pandas as pd
 import random
 import re
 import sys
+import time
 
 import partial_digest as pard
 
@@ -56,7 +57,7 @@ def parse_user_input():
     parser.add_argument('-max', type=int, required=False,
             help='max fragment length after first cut (optional, defaults to mean + 6 stdevs)')
 
-    parser.add_argument('-complete', type=float, required=True,
+    parser.add_argument('-cut_prob', type=float, required=True,
             help='percent probability of per-site cut; use \'1\' for complete digestion of fragments (fragments will not contain internal RE sites)')
 
     parser.add_argument('-a1', type=str, required=False,
@@ -178,7 +179,7 @@ def open_fastq(fastq):
                 i = 0
 
 
-def digest_genome(motif_dt, frag_len, proj):
+def digest_genome(motif_dt, frag_len):
     """
     process fasta sequences as restricion enzyme fragments
 
@@ -186,23 +187,18 @@ def digest_genome(motif_dt, frag_len, proj):
 
     output 'raw_digest' file holds all the resulting fragments
     """
-    digest_file = os.path.join(proj, 'raw_digest_' + os.path.basename(args.genome) + '.csv')
-    dfile = open(digest_file, 'w')
-    dfile.write('seq,start,end,strand,length\n')
 
     if test_unicode(args.genome):
         fasta = gzip.open(args.genome, 'rt')
     else:
         fasta = open(args.genome)
 
-    begin = 0
-    gen_ls = []
-    seq = ''
+    begin, gen_ls, seq = 0, [], ''
+
     for line in fasta:
         if line.startswith('>') and seq:
             seq_ls = digest_seq(begin, seq, motif_dt, frag_len)
-            seq_ls = second_digest(seq_ls, motif_dt, frag_len)
-            gen_ls.extend([i+[len(i[0])] for i in seq_ls])
+            gen_ls.extend(seq_ls)
             begin += len(seq)
             seq = ''
             chr_name = line.rstrip()[1:].replace(' ', '_').replace(',','')
@@ -212,18 +208,13 @@ def digest_genome(motif_dt, frag_len, proj):
             seq += line.rstrip().upper()
 
     seq_ls = digest_seq(begin, seq, motif_dt, frag_len)
-    seq_ls = second_digest(seq_ls, motif_dt, frag_len)
-    gen_ls.extend([i+[len(i[0])] for i in seq_ls])
+    gen_ls.extend(seq_ls)
     begin += len(seq)
-
-    if len(gen_ls) > 0:
-        digest_stats(gen_ls, begin)
-        write_digested_reads(gen_ls, dfile)
-
-    dfile.close()
     fasta.close()
 
-    return digest_file
+    df = pd.DataFrame(gen_ls, columns=['seq', 'start', 'end', 'm1', 'm2'])
+
+    return df
 
 
 def digest_seq(begin, seq, motif_dt, frag_len):
@@ -234,17 +225,28 @@ def digest_seq(begin, seq, motif_dt, frag_len):
     each item in seq_ls is [sequence, start, end]
     """
     seq_ls = []
-    for motif in motif_dt.keys():
-        for idx in re.finditer('(?=' + motif + ')', seq):
+    for motif1 in motif_dt.keys():
+        for idx in re.finditer('(?=' + motif1 + ')', seq):
             start = idx.start()
-            end = start + frag_len
-            fragment = seq[start:end]
-            if fragment not in motif_dt:
-                seq_ls.append([fragment,
-                               begin+start,
-                               begin+start+len(fragment)])
+            fragment = seq[start: start + frag_len]
+            seq_ls.extend(digest_frag(fragment, motif_dt, motif1, begin+start))
 
-    return [[reverse_comp(i[0]), i[1], i[2]] for i in seq_ls]
+    return seq_ls
+
+
+def digest_frag(fragment, motif_df, motif1, f_start):
+    frag_ls, end_ls = [], []
+
+    for motif2 in motif_dt.keys():
+        for idx in re.finditer('(?=' + motif2 + ')', fragment[1:]):
+            end = idx.start()+1
+            frag_ls.append([fragment[:end+len(motif2)],
+                            f_start,
+                            f_start+end,
+                            motif1,
+                            motif2])
+
+    return frag_ls
 
 
 def reverse_comp(seq):
@@ -254,61 +256,6 @@ def reverse_comp(seq):
         new += revc[base]
 
     return new
-
-
-def second_digest(seq_ls, motif_dt, frag_len):
-    second_ls = []
-    for i in seq_ls:
-        subseqs = digest_seq(0, i[0], motif_dt, frag_len)
-        subseqs = [[j[0], i[1], i[2]-j[1], '+'] for j in subseqs]
-        second_ls += subseqs
-    second_ls += [[reverse_comp(i[0]), i[1], i[2], '-'] for i in second_ls]
-    second_ls = [orientation_test(*i) for i in second_ls]
-    second_ls = [i for i in second_ls if i[0]]
-
-    if args.complete == 1:
-        second_ls = [[complete_digest(i[0], motif_dt)] + i[1:] for i in second_ls]
-        second_ls = [i for i in second_ls if i[0]]
-
-    if len(second_ls) == 0:
-        return second_ls
-
-    return second_ls
-
-
-def orientation_test(seq, start, end, strand):
-    """
-    reads passed here contain intact RE motifs
-    (i.e., AG/CT remains AGCT, not CT)
-
-    this is necessary if sticky ends will be used in ligating
-    fragments to adapters
-    """
-    for motif1, offset1 in motif_dt1.items():
-        if re.search('^'+motif1, seq):
-            for motif2, offset2 in motif_dt2.items():
-                if re.search(motif2+'$', seq):
-                    #start += offset1
-                    #end -= len(motif2)-offset2
-                    end = end - len(motif2) if strand == '+' else end - len(motif1)
-                    if offset2 == 0 or len(motif2) == offset2:
-                        return [seq[offset1:], start, end, strand]
-                    else:
-                        return [seq[offset1:-(len(motif2)-offset2)], start, end, strand]
-
-    return [None, start, end, strand]
-
-
-def complete_digest(seq, motif_dt):
-    """
-    remove any fragments containing an internal cut site for any of the
-    restriction enzymes used
-    """
-    for motif in motif_dt:
-        if motif in seq [1:-1]:
-            return False
-
-    return seq
 
 
 def digest_stats(gen_ls, begin):
@@ -338,9 +285,43 @@ def digest_stats(gen_ls, begin):
         print(str(k) + ':' + ' ' * (len(str(max(stats_dt)))-len(str(k))) + '|' * round(v/denom))
 
 
-def write_digested_reads(gen_ls, dfile):
-    for i in gen_ls:
-        dfile.write(f'{i[0]},{str(i[1])},{str(i[2])},{i[3]},{str(i[4])}\n')
+def process_df(df, digest_file):
+    df['length'] = df['seq'].str.len()
+    df['forward'] = np.where((df['m1'].isin(motif_dt1.keys()) & \
+                             df['m2'].isin(motif_dt2.keys())), 1, 0)
+    df['reverse'] = np.where((df['m1'].isin(motif_dt2.keys()) & \
+                             df['m2'].isin(motif_dt1.keys())), 1, 0)
+
+    # remove unviable combos after getting site_ls
+    df.drop(df[(df['forward'] == 0) & (df['reverse'] == 0)].index, inplace = True)
+    df = df.reset_index(drop=True)
+
+    # create a column of reverse complement sequences
+    df['revc'] = [reverse_comp(i) for i in df['seq'].to_list()]
+
+    # duplicate all the reads that work both ways (if RE in m1 and m2)
+    tmp_df = df[(df['forward'] == 1) & (df['reverse'] == 1)]
+    tmp_df = tmp_df.reset_index(drop=True)
+
+    # recategorize the seqs in df as being forward
+    df.loc[(df['forward'] == 1) & (df['reverse'] == 1), 'reverse'] = 0
+
+    # convert remaining reverse strand sequences to the reverse complement
+    df.loc[df['reverse'] == 1, 'seq'] = df['revc']
+
+    # make all tmp_df reads reverse complements and recategorize as reverse
+    tmp_df['seq'] = tmp_df['revc'].values
+    tmp_df.loc[:,'forward'] = 0
+    tmp_df.loc[:,'reverse'] = 1
+
+    df = pd.concat([df, tmp_df])
+    df = df.sort_values(by=['length'])
+    df = df.reset_index(drop=True)
+    df.drop('revc', axis=1, inplace=True)
+    df.drop('forward', axis=1, inplace=True)
+    df.to_csv(digest_file, index=None)
+
+    return digest_file 
 
 
 def save_histogram(proj, digest_file):
@@ -351,34 +332,55 @@ def save_histogram(proj, digest_file):
 
 
 def duplicate_fragments(proj, digest_file):
+    new_start = time.time() #TODO
     df = pd.read_csv(digest_file)
+
+    # get set of all unique restriction site positions
+    site_ls = list(set(df['start'].tolist() + df['end'].tolist()))
+    site_ls.sort()
+
     pool = Pool(args.t)
     pool_ls = [i+1 for i in range(args.n)]
-    pool_part = partial(pard.incomplete_digest, df, args.max, args.complete, args.min)
+    pool_part = partial(pard.incomplete_digest, df, site_ls, args.max, args.cut_prob, args.min)
     indices = pool.map(pool_part, pool_ls)
     pool.close
-    copy_df = pd.DataFrame()
 
+    new_end = time.time() #TODO
+    print(new_end-new_start) #TODO
+    df['copies'] = 0
+
+    copy_dt = {}
     for i in indices:
-        copy_df = pd.concat([copy_df, df.iloc[i]])
-    dup_file = os.path.join(proj, 'copies_' + os.path.basename(args.genome    ) + '.csv')
-    copy_df.to_csv(dup_file, index=None)
+        for j in i:
+            if j in copy_dt:
+                copy_dt[j] += 1
+            else:
+                copy_dt[j] = 1
+
+    for idx, count in copy_dt.items():
+        df.loc[idx, 'copies'] = count
+
+    dup_file = os.path.join(proj, 'copies_' + os.path.basename(args.genome) + '.csv')
+    df.drop(df[df['copies'] == 0].index, inplace = True)
+    df = df.reset_index(drop=True)
+    df.to_csv(dup_file, index=None)
 
     return dup_file
 
 
-def size_selection(proj, digest_file):
+def size_selection(proj, dup_file):
     """
     using the previously created digest file containing raw fragments
     of genomic dna of varying length, optionally add adapters, then
     simulate a random sampling of reads in a desired size range
     """
-    if args.a1:
-        digest_file = simulate_adapters(digest_file)
-    else:
-        digest_file = no_adapters(digest_file)
+    #TODO add adapters on the fly after size selection
+    #if args.a1:
+    #    dup_file = simulate_adapters(dup_file)
+    #else:
+    #    dup_file = no_adapters(dup_file)
 
-    sampled_df = simulate_length(digest_file, proj)
+    sampled_df = simulate_length(dup_file, proj)
 
     if args.test:
         sys.exit()
@@ -396,14 +398,14 @@ def size_selection(proj, digest_file):
             read_writer_basic(sampled_df, r1, r2)
 
 
-def simulate_adapters(digest_file):
+def simulate_adapters(dup_file):
     """
     simulate ligation of adapters to sequences
 
     adapters must contain RE motif if sticky ends are used
     the associated barcode is saved alongside the read as r1/2_id
     """
-    df = pd.read_csv(digest_file)
+    df = pd.read_csv(dup_file)
     lig_seq_ls = []
     r1_ls = []
     r2_ls = []
@@ -431,38 +433,42 @@ def simulate_adapters(digest_file):
     return adapt_file
 
 
-def no_adapters(digest_file):
+def no_adapters(dup_file):
     """
     adjust df for lack of adapters
     """
-    df = pd.read_csv(digest_file)
+    df = pd.read_csv(dup_file)
     df['full_length'] = df['length']
     df['r1_id'] = ['na' for i in df['seq']]
     df['r2_id'] = ['na' for i in df['seq']]
 
     df = df[['seq','start','end','strand','length','full_length','r1_id','r2_id']]
-    df.to_csv(digest_file, index=None)
+    df.to_csv(dup_file, index=None)
 
-    return digest_file
+    return dup_file
 
 
-def simulate_length(digest_file, proj):
+def simulate_length(dup_file, proj):
     """
     sampling is performed by first assessing the count of fragments for
     each possible read length and then generating a normal distribution
     that includes enough counts in the mean+2sd range to include a 1X
     coverage of the genome
     """
-    df = pd.read_csv(digest_file)
+    df = pd.read_csv(dup_file)
+
+    if len(df) == 0:
+        sys.exit('no fragments produced with current settings')
+
     col_names = [col for col in df.columns]
+    df['full_length'] = df['length'] #TODO add average adapter lengths (a1 + a2)
     df.sort_values(['full_length'], ascending=[True], inplace=True)
     df.reset_index(inplace=True, drop=True)
 
     # create a len_dt, storing the count for each length
     len_dt = {}
     for i in range(args.mean, args.mean + 2*args.sd):
-        len_dt[i] = len(df[df.full_length == i])
-
+        len_dt[i] = df[df.full_length == i]['copies'].sum()
     total_reads = sum(len_dt.values())
     keep_going = True
 
@@ -482,7 +488,7 @@ def simulate_length(digest_file, proj):
 
     for i in range(min(draw_ls), max(draw_ls)+1):
         draw_counts = draw_ls.count(i)
-        data_counts = df[df.full_length == i].shape[0]
+        data_counts = df[df.full_length == i]['copies'].sum()
         draw_dt[i] = min(draw_counts, data_counts)
 
     # for each fragment length, randomly draw reads
@@ -675,14 +681,29 @@ if __name__ == '__main__':
     if args.r2:
         open_fastq(args.r2)
 
+    digest_file = os.path.join(proj, 'raw_digest_' + os.path.basename(args.genome) + '.csv')
+
+    #TODO add option to input existing digest_file and skip digest_genome
+    #TODO consider chromosome by chromosome approach
+        # this would only temporarily store sequences in the raw digest
+        # raw digests (per chromosome) will be digested and stored as copies
+
+    start = time.time() #TODO
     print('\nsimulating restriction digest\n')
-    digest_file = digest_genome(motif_dt, frag_len, proj)
-    save_histogram(proj, digest_file)
+    df = digest_genome(motif_dt, frag_len)
+    digest_file  = process_df(df, digest_file)
+    #save_histogram(proj, digest_file) #TODO need to take counts
+    end = time.time() #TODO
+    print(end-start) #TODO
 
+    start = time.time() #TODO
     print('\nsimulating genome copy number\n')
-    digest_file = duplicate_fragments(proj, digest_file)
-    save_histogram(proj, digest_file)
+    dup_file = duplicate_fragments(proj, digest_file)
+    #save_histogram(proj, dup_file) #TODO need to take counts
+    end = time.time() #TODO
+    print(end-start) #TODO
 
+    start = time.time() #TODO
     print('\nsimulating size selection\n')
-    size_selection(proj, digest_file)
+    size_selection(proj, dup_file)
 

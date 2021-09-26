@@ -1,46 +1,38 @@
 import numpy as np
 import pandas as pd
+import random
 import sys
 
 
-def incomplete_digest(df, frag_len, cut_prob, min_dist, copy_no):
-    site_ls = list(set(df['start'].tolist() + df['end'].tolist()))
-    site_ls.sort()
-    cut_ls = probability_digest(site_ls, cut_prob, min_dist)
-    site_ls = [i for (i, v) in zip(site_ls, cut_ls) if v]
-    start = site_ls[0]
+def incomplete_digest(df, site_ls, frag_len, cut_prob, min_dist, copy_no):
+    cut_pairs = generate_cuts(site_ls, cut_prob)
+    #TODO add ability to modify cuts if too close (min_dist)
 
     indices = []
 
-    for site in site_ls[1:]:
-        if site - frag_len > start:
-            start = site
-        else:
-            end = site
-            hits = (df.index[(df['start'] == start) & (df['end'] == end)].    tolist())
-            if len(hits) == 2:
-                hits = np.random.choice(hits, 1)
-            if hits:
-                indices.extend(hits)
-            start = site
+    for start, end in cut_pairs:
+        hits = (df.index[(df['start'] == start) & (df['end'] == end)].tolist())
+        if len(hits) == 2:
+            hits = np.random.choice(hits, 1)
+        if hits:
+            indices.extend(hits)
 
     return indices
 
 
-def probability_digest(site_ls, cut_prob, min_dist):
-    last_cut = -min_dist
-    cut_ls = []
-    for idx, site in enumerate(site_ls):
-        if site - last_cut < min_dist:
-            cut = 0 #TODO adjust for variable enzyme behavior
-            cut_ls.append(cut)
-        else:
-            cut = np.random.choice([1, 0], 1, p=[cut_prob, 1-cut_prob])
-            cut_ls.extend(cut)
-        if cut:
-            last_cut = site
+def generate_cuts(site_ls, cut_prob):
+    ones = round(cut_prob * len(site_ls))
+    zeroes = len(site_ls) - ones
+    cut_ls = [0] * zeroes + [1] * ones
+    random.shuffle(cut_ls)
+    cut_ls = [i for (i, v) in zip(site_ls, cut_ls) if v]
 
-    return cut_ls
+    cut_pairs = []
+
+    for idx, i in enumerate(cut_ls[:-1]):
+        cut_pairs.append(cut_ls[idx:idx+2])
+
+    return cut_pairs
 
 
 if __name__ == '__main__':
