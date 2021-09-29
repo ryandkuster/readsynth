@@ -11,10 +11,7 @@ import re
 import sys
 import time
 
-import partial_digest as pard
-
-from functools import partial
-from multiprocessing import Pool
+import n_copies 
 from scripts.gzip_test import test_unicode
 
 
@@ -235,6 +232,10 @@ def digest_seq(begin, seq, motif_dt, frag_len):
 
 
 def digest_frag(fragment, motif_df, motif1, f_start):
+    '''
+    further search each RE starting point + frag_len for more
+    RE sites, return list of seq, start, end, m1, m2
+    '''
     frag_ls, end_ls = [], []
 
     for motif2 in motif_dt.keys():
@@ -250,6 +251,9 @@ def digest_frag(fragment, motif_df, motif1, f_start):
 
 
 def reverse_comp(seq):
+    '''
+    return the reverse complement of an input sequence
+    '''
     revc = {'A': 'T', 'C': 'G', 'G': 'C', 'T': 'A', 'N': 'N'}
     new = ''
     for base in reversed(seq):
@@ -329,43 +333,6 @@ def save_histogram(proj, digest_file):
     ax = df['length'].hist(bins=100, range=[0, args.max])
     fig = ax.get_figure()
     fig.savefig(os.path.join(proj, 'hist_' + os.path.basename(digest_file)[:-4] + '.png'))
-
-
-def duplicate_fragments(proj, digest_file):
-    new_start = time.time() #TODO
-    df = pd.read_csv(digest_file)
-
-    # get set of all unique restriction site positions
-    site_ls = list(set(df['start'].tolist() + df['end'].tolist()))
-    site_ls.sort()
-
-    pool = Pool(args.t)
-    pool_ls = [i+1 for i in range(args.n)]
-    pool_part = partial(pard.incomplete_digest, df, site_ls, args.max, args.cut_prob, args.min)
-    indices = pool.map(pool_part, pool_ls)
-    pool.close
-
-    new_end = time.time() #TODO
-    print(new_end-new_start) #TODO
-    df['copies'] = 0
-
-    copy_dt = {}
-    for i in indices:
-        for j in i:
-            if j in copy_dt:
-                copy_dt[j] += 1
-            else:
-                copy_dt[j] = 1
-
-    for idx, count in copy_dt.items():
-        df.loc[idx, 'copies'] = count
-
-    dup_file = os.path.join(proj, 'copies_' + os.path.basename(args.genome) + '.csv')
-    df.drop(df[df['copies'] == 0].index, inplace = True)
-    df = df.reset_index(drop=True)
-    df.to_csv(dup_file, index=None)
-
-    return dup_file
 
 
 def size_selection(proj, dup_file):
@@ -591,8 +558,6 @@ def read_writer_samples(sampled_df, r1, r2):
             id += 1
 
 
-
-
 def read_mutator_samples(seq, scores_dt, sampled_q):
     """
     using actual sampled per-read q scores, mutate bases
@@ -698,7 +663,7 @@ if __name__ == '__main__':
 
     start = time.time() #TODO
     print('\nsimulating genome copy number\n')
-    dup_file = duplicate_fragments(proj, digest_file)
+    dup_file = n_copies.digest_n_copies(proj, digest_file, args)
     #save_histogram(proj, dup_file) #TODO need to take counts
     end = time.time() #TODO
     print(end-start) #TODO
