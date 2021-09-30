@@ -323,9 +323,23 @@ def process_df(df, digest_file):
     df = df.reset_index(drop=True)
     df.drop('revc', axis=1, inplace=True)
     df.drop('forward', axis=1, inplace=True)
+
+    # add a quick step that removes appropriate over/underhang
+    for mot, front in motif_dt.items():
+        back = len(mot) - front
+        df.loc[(df['m1'] == mot) & (df['reverse'] == 0), 'seq'] = \
+                df['seq'].str[front:]
+        df.loc[(df['m1'] == mot) & (df['reverse'] == 1), 'seq'] = \
+                df['seq'].str[:-back]
+        df.loc[(df['m2'] == mot) & (df['reverse'] == 0), 'seq'] = \
+                df['seq'].str[:-back]
+        df.loc[(df['m2'] == mot) & (df['reverse'] == 1), 'seq'] = \
+                df['seq'].str[front:]
+
+    #TODO readjust length?
     df.to_csv(digest_file, index=None)
 
-    return digest_file 
+    return digest_file
 
 
 def save_histogram(proj, digest_file):
@@ -653,22 +667,15 @@ if __name__ == '__main__':
         # this would only temporarily store sequences in the raw digest
         # raw digests (per chromosome) will be digested and stored as copies
 
-    start = time.time() #TODO
     print('\nsimulating restriction digest\n')
     df = digest_genome(motif_dt, frag_len)
     digest_file  = process_df(df, digest_file)
     #save_histogram(proj, digest_file) #TODO need to take counts
-    end = time.time() #TODO
-    print(end-start) #TODO
 
-    start = time.time() #TODO
     print('\nsimulating genome copy number\n')
     dup_file = n_copies.digest_n_copies(proj, digest_file, args)
     #save_histogram(proj, dup_file) #TODO need to take counts
-    end = time.time() #TODO
-    print(end-start) #TODO
 
-    start = time.time() #TODO
     print('\nsimulating size selection\n')
     size_selection(proj, dup_file)
 
