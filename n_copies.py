@@ -3,14 +3,12 @@ import os
 import pandas as pd
 import random
 import sys
-import time
 
 from functools import partial
 from multiprocessing import Pool
 
 
-def digest_n_copies(proj, digest_file, args):
-    new_start = time.time() #TODO
+def main(proj, digest_file, args):
     df = pd.read_csv(digest_file)
 
     # get set of all unique restriction site positions

@@ -1,18 +1,18 @@
 #!/usr/bin/env python
 
 import argparse
-import gzip
 import math
+import matplotlib.pyplot as plt
 import numpy as np
 import os
 import pandas as pd
 import random
 import re
 import sys
-import time
 
-import n_copies 
-from scripts.gzip_test import test_unicode
+import n_copies
+import digest_genomes
+import size_selection
 
 
 def parse_user_input():
@@ -176,80 +176,6 @@ def open_fastq(fastq):
                 i = 0
 
 
-def digest_genome(motif_dt, frag_len):
-    """
-    process fasta sequences as restricion enzyme fragments
-
-    input args.genome is fasta
-
-    output 'raw_digest' file holds all the resulting fragments
-    """
-
-    if test_unicode(args.genome):
-        fasta = gzip.open(args.genome, 'rt')
-    else:
-        fasta = open(args.genome)
-
-    begin, gen_ls, seq = 0, [], ''
-
-    for line in fasta:
-        if line.startswith('>') and seq:
-            seq_ls = digest_seq(begin, seq, motif_dt, frag_len)
-            gen_ls.extend(seq_ls)
-            begin += len(seq)
-            seq = ''
-            chr_name = line.rstrip()[1:].replace(' ', '_').replace(',','')
-        elif line.startswith('>'):
-            chr_name = line.rstrip()[1:].replace(' ', '_').replace(',','')
-        else:
-            seq += line.rstrip().upper()
-
-    seq_ls = digest_seq(begin, seq, motif_dt, frag_len)
-    gen_ls.extend(seq_ls)
-    begin += len(seq)
-    fasta.close()
-
-    df = pd.DataFrame(gen_ls, columns=['seq', 'start', 'end', 'm1', 'm2'])
-
-    return df
-
-
-def digest_seq(begin, seq, motif_dt, frag_len):
-    """
-    for every chromosome (seq), find all RE recognition positions
-    and preserve frag_len bp ahead as a possible template (fragment)
-
-    each item in seq_ls is [sequence, start, end]
-    """
-    seq_ls = []
-    for motif1 in motif_dt.keys():
-        for idx in re.finditer('(?=' + motif1 + ')', seq):
-            start = idx.start()
-            fragment = seq[start: start + frag_len]
-            seq_ls.extend(digest_frag(fragment, motif_dt, motif1, begin+start))
-
-    return seq_ls
-
-
-def digest_frag(fragment, motif_df, motif1, f_start):
-    '''
-    further search each RE starting point + frag_len for more
-    RE sites, return list of seq, start, end, m1, m2
-    '''
-    frag_ls, end_ls = [], []
-
-    for motif2 in motif_dt.keys():
-        for idx in re.finditer('(?=' + motif2 + ')', fragment[1:]):
-            end = idx.start()+1
-            frag_ls.append([fragment[:end+len(motif2)],
-                            f_start,
-                            f_start+end,
-                            motif1,
-                            motif2])
-
-    return frag_ls
-
-
 def reverse_comp(seq):
     '''
     return the reverse complement of an input sequence
@@ -342,41 +268,48 @@ def process_df(df, digest_file):
     return digest_file
 
 
-def save_histogram(proj, digest_file):
-    df = pd.read_csv(digest_file)
-    ax = df['length'].hist(bins=100, range=[0, args.max])
-    fig = ax.get_figure()
-    fig.savefig(os.path.join(proj, 'hist_' + os.path.basename(digest_file)[:-4] + '.png'))
+def save_hist(proj, read_file, title, leglab):
+    df = pd.read_csv(read_file)
+
+    length_ls = []
+    if 'counts'  in [col for col in df]:
+        for idx, row in df.iterrows():
+            length_ls.extend([row['full_length'] for i in range(row['counts'])])
+    elif 'copies' in [col for col in df]:
+        for idx, row in df.iterrows():
+            length_ls.extend([row['length'] for i in range(row['copies'])])
+    else:
+        length_ls = df['length'].to_list()
+
+    plt.hist(length_ls, bins=100, range=[0, args.max], label=leglab, alpha=0.75)
+    plt.xlabel('Fragment Length')
+    plt.ylabel('Count')
+    plt.title('Distribution of ' + title)
+    plt.legend()
+    plt.savefig(os.path.join(proj, 'hist_' + os.path.basename(read_file)[:-4] \
+                + '.png'), facecolor='white', transparent=False)
 
 
-def size_selection(proj, dup_file):
+def write_reads(proj, sampled_file):
     """
-    using the previously created digest file containing raw fragments
-    of genomic dna of varying length, optionally add adapters, then
-    simulate a random sampling of reads in a desired size range
+    using the sampled read distribution, write to file as fastq format
+    if adapters, randomly add sample and concatenate adapters
+    if sample fastq data provided, mutate samples for error simulation
     """
+    df = pd.read_csv(sampled_file)
     #TODO add adapters on the fly after size selection
-    #if args.a1:
-    #    dup_file = simulate_adapters(dup_file)
-    #else:
-    #    dup_file = no_adapters(dup_file)
-
-    sampled_df = simulate_length(dup_file, proj)
-
-    if args.test:
-        sys.exit()
-    elif not args.a1s:
+    if not args.a1s:
         args.a1s, args.a2s = 0, 0
 
     with open(os.path.join(proj, os.path.basename(args.genome) + '_R1.fastq'), 'w') as r1,\
          open(os.path.join(proj, os.path.basename(args.genome) + '_R2.fastq'), 'w') as r2:
 
         if args.r1:
-            read_writer_samples(sampled_df, r1, r2)
+            read_writer_samples(df, r1, r2)
         elif args.q1:
-            read_writer(sampled_df, r1, r2)
+            read_writer(df, r1, r2)
         else:
-            read_writer_basic(sampled_df, r1, r2)
+            read_writer_basic(df, r1, r2)
 
 
 def simulate_adapters(dup_file):
@@ -414,111 +347,14 @@ def simulate_adapters(dup_file):
     return adapt_file
 
 
-def no_adapters(dup_file):
-    """
-    adjust df for lack of adapters
-    """
-    df = pd.read_csv(dup_file)
-    df['full_length'] = df['length']
-    df['r1_id'] = ['na' for i in df['seq']]
-    df['r2_id'] = ['na' for i in df['seq']]
-
-    df = df[['seq','start','end','strand','length','full_length','r1_id','r2_id']]
-    df.to_csv(dup_file, index=None)
-
-    return dup_file
-
-
-def simulate_length(dup_file, proj):
-    """
-    sampling is performed by first assessing the count of fragments for
-    each possible read length and then generating a normal distribution
-    that includes enough counts in the mean+2sd range to include a 1X
-    coverage of the genome
-    """
-    df = pd.read_csv(dup_file)
-
-    if len(df) == 0:
-        sys.exit('no fragments produced with current settings')
-
-    col_names = [col for col in df.columns]
-    df['full_length'] = df['length'] #TODO add average adapter lengths (a1 + a2)
-    df.sort_values(['full_length'], ascending=[True], inplace=True)
-    df.reset_index(inplace=True, drop=True)
-
-    # create a len_dt, storing the count for each length
-    len_dt = {}
-    for i in range(args.mean, args.mean + 2*args.sd):
-        len_dt[i] = df[df.full_length == i]['copies'].sum()
-    total_reads = sum(len_dt.values())
-    keep_going = True
-
-    # produce a normal distribution that includes mean + 2sd counts
-    while keep_going is True:
-        keep_going = False
-        draw_ls = np.random.normal(loc=args.mean,scale=args.sd,size=total_reads)
-        draw_ls = [round(i) for i in draw_ls]
-        for i, len_count in len_dt.items():
-            if len_count > draw_ls.count(i):
-                total_reads = round(total_reads*1.1)
-                keep_going = True
-                break
-
-    # create a dictionary of draw numbers
-    draw_dt = {}
-
-    for i in range(min(draw_ls), max(draw_ls)+1):
-        draw_counts = draw_ls.count(i)
-        data_counts = df[df.full_length == i]['copies'].sum()
-        draw_dt[i] = min(draw_counts, data_counts)
-
-    # for each fragment length, randomly draw reads
-    sampled_df = pd.DataFrame(columns=col_names)
-    counts = []
-
-    for length, draws in draw_dt.items():
-        tmp_df = df.loc[df['full_length'] == length]
-        if len(tmp_df) == 0:
-            continue
-        indices = [i for i in range(len(tmp_df))]
-        sampled_idx = random.choices(indices, k=draws)
-        counts += [sampled_idx.count(idx) for idx in indices]
-        sampled_df = pd.concat([sampled_df, tmp_df])
-
-    sampled_df['counts'] = counts
-    index_names = sampled_df[sampled_df['counts'] == 0].index
-    sampled_df.drop(index_names, inplace=True)
-    samp_no = sampled_df['counts'].sum()
-    print(f'fragments sampled around mean of {args.mean}bp : {samp_no}')
-    sampled_df.reset_index(inplace=True, drop=True)
-    sampled_file = os.path.join(proj, 'sampled_' + os.path.basename(args.genome) + '.csv')
-    sampled_df.to_csv(sampled_file, index=None)
-
-    #TODO start testing visual
-    histogram_seqs = pd.DataFrame(columns=['full_length'])
-    length_ls = []
-
-    for idx, row in sampled_df.iterrows():
-        length_ls.extend([row['full_length'] for i in range(row['counts'])])
-
-    histogram_seqs['full_length'] = length_ls
-    ax = histogram_seqs['full_length'].hist(bins=100, range=[0, args.max])
-    fig = ax.get_figure()
-    fig.savefig(os.path.join(proj, 'hist_' + os.path.basename(sampled_file)[:-4] + '.png'))
-
-    #TODO end testing visual
-
-    return sampled_df
-
-
-def read_writer(sampled_df, r1, r2):
+def read_writer(df, r1, r2):
     """
     args.a1s is where to begin in the R1 adapter
     args.a2s is where to begin in the R2 adapter
     """
     gen_name = os.path.basename(args.genome)
     id = 0
-    for idx, row in sampled_df.iterrows():
+    for idx, row in df.iterrows():
         r1_seq = row['seq'][args.a1s:args.a1s+args.l].ljust(args.l, 'G')
         r2_seq = reverse_comp(row['seq'])[args.a2s:args.a2s+args.l].ljust(args.l, 'G')
         for count in range(row['counts']):
@@ -547,7 +383,7 @@ def read_mutator(seq, prob_mx, scores_dt, q_ls):
     return mut_seq, score
 
 
-def read_writer_samples(sampled_df, r1, r2):
+def read_writer_samples(df, r1, r2):
     """
     args.a1s is where to begin in the R1 adapter
     args.a2s is where to begin in the R2 adapter
@@ -559,7 +395,7 @@ def read_writer_samples(sampled_df, r1, r2):
     args.l = len(max(sampled_q1, key=len))
     gen_name = os.path.basename(args.genome)
     id = 0
-    for idx, row in sampled_df.iterrows():
+    for idx, row in df.iterrows():
         r1_seq = row['seq'][args.a1s:args.a1s+args.l].ljust(args.l, 'G')
         r2_seq = reverse_comp(row['seq'])[args.a2s:args.a2s+args.l].ljust(args.l, 'G')
         for count in range(row['counts']):
@@ -588,7 +424,7 @@ def read_mutator_samples(seq, scores_dt, sampled_q):
     return mut_seq, score
 
 
-def read_writer_basic(sampled_df, r1, r2):
+def read_writer_basic(df, r1, r2):
     """
     create a fastq-formatted output with no attempt at error profiling
 
@@ -598,7 +434,7 @@ def read_writer_basic(sampled_df, r1, r2):
     gen_name = os.path.basename(args.genome)
     id = 0
     score = 'I' * args.l
-    for idx, row in sampled_df.iterrows():
+    for idx, row in df.iterrows():
         r1_seq = row['seq'][args.a1s:args.a1s+args.l].ljust(args.l, 'G')
         r2_seq = reverse_comp(row['seq'])[args.a2s:args.a2s+args.l].ljust(args.l, 'G')
         for count in range(row['counts']):
@@ -668,14 +504,21 @@ if __name__ == '__main__':
         # raw digests (per chromosome) will be digested and stored as copies
 
     print('\nsimulating restriction digest\n')
-    df = digest_genome(motif_dt, frag_len)
+    df = digest_genomes.main(motif_dt, frag_len, args)
     digest_file  = process_df(df, digest_file)
-    #save_histogram(proj, digest_file) #TODO need to take counts
+    save_hist(proj, digest_file, 'Possible Raw Fragments', 'possible')
 
     print('\nsimulating genome copy number\n')
-    dup_file = n_copies.digest_n_copies(proj, digest_file, args)
-    #save_histogram(proj, dup_file) #TODO need to take counts
+    dup_file = n_copies.main(proj, digest_file, args)
+    save_hist(proj, dup_file, f'Fragments of {args.n}X Copy Number', \
+              f'{args.n} copies')
 
     print('\nsimulating size selection\n')
-    size_selection(proj, dup_file)
+    sampled_file = size_selection.main(dup_file, proj, args)
+    save_hist(proj, sampled_file, 'Size Selected Fragments', 'size selected')
+
+    if args.test:
+        sys.exit()
+
+    write_reads(proj, sampled_file)
 
