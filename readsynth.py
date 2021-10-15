@@ -9,6 +9,7 @@ import pandas as pd
 import random
 import re
 import sys
+import time
 
 import n_copies
 import digest_genomes
@@ -188,33 +189,6 @@ def reverse_comp(seq):
     return new
 
 
-def digest_stats(gen_ls, begin):
-    """
-    prints a histogram to screen for every input sequence
-    """
-    seq_ls = [seq[0] for seq in gen_ls]
-    stats_dt = {}
-    len_ls = [len(seq) for seq in seq_ls]
-    for num in range(args.sd, max(max(len_ls), args.sd)+args.sd, args.sd):
-        stats_dt[int(math.ceil(num / 10.0)) * 10] = 0
-
-    print(f'input genome length: {begin} bp')
-    print(f'average fragment length: {round(sum(map(len, seq_ls)) / len(seq_ls), 2)} bp')
-    print(f'number of fragments: {len(seq_ls)}')
-
-    col, row = os.get_terminal_size()
-    for leng in len_ls:
-        for bin in stats_dt.keys():
-            if leng <= bin:
-                stats_dt[bin] += 1
-                break
-
-    highest = stats_dt[max(stats_dt, key=lambda i: stats_dt[i])]
-    denom = highest/(col-10)
-    for k, v in stats_dt.items():
-        print(str(k) + ':' + ' ' * (len(str(max(stats_dt)))-len(str(k))) + '|' * round(v/denom))
-
-
 def process_df(df, digest_file):
     df['length'] = df['seq'].str.len()
     df['forward'] = np.where((df['m1'].isin(motif_dt1.keys()) & \
@@ -297,6 +271,7 @@ def write_reads(proj, sampled_file):
     if sample fastq data provided, mutate samples for error simulation
     """
     df = pd.read_csv(sampled_file)
+
     #TODO add adapters on the fly after size selection
     if not args.a1s:
         args.a1s, args.a2s = 0, 0
@@ -431,16 +406,29 @@ def read_writer_basic(df, r1, r2):
     args.a1s is where to begin in the R1 adapter
     args.a2s is where to begin in the R2 adapter
     """
+    df = np.array(df)
     gen_name = os.path.basename(args.genome)
     id = 0
     score = 'I' * args.l
-    for idx, row in df.iterrows():
-        r1_seq = row['seq'][args.a1s:args.a1s+args.l].ljust(args.l, 'G')
-        r2_seq = reverse_comp(row['seq'])[args.a2s:args.a2s+args.l].ljust(args.l, 'G')
-        for count in range(row['counts']):
-            r1.write(f'@{id}:{idx}:{row[5]}:{row[4]}:{row[6]}:{row[7]}:' \
+    args.a1 = list(args.a1.items())
+    args.a2 = list(args.a2.items())
+    a1s = args.a1s
+    a1e = args.a1s + args.l
+    a2s = args.a2s
+    a2e = args.a2s + args.l
+    # seq   start   end m1  m2  length  reverse copies  full    counts
+    # 0     1       2   3   4   5       6       7       8       9
+    for idx, i in enumerate(df):
+        seq = i[0]
+        for j in range(i[9]):
+            a1 = random.choice(args.a1)
+            a2 = random.choice(args.a2)
+            seq = a1[0] + seq + a2[0]
+            r1_seq = seq[a1s:a1e].ljust(args.l, 'G')
+            r2_seq = reverse_comp(seq)[a2s:a2e].ljust(args.l, 'G')
+            r1.write(f'@{id}:{idx}:{i[8]}:{i[5]}:{a1[1]}:{a2[1]}:' \
                      f'{gen_name} 1\n{r1_seq}\n+\n{score}\n')
-            r2.write(f'@{id}:{idx}:{row[5]}:{row[4]}:{row[6]}:{row[7]}:' \
+            r2.write(f'@{id}:{idx}:{i[8]}:{i[5]}:{a1[1]}:{a2[1]}:' \
                      f'{gen_name} 2\n{r2_seq}\n+\n{score}\n')
             id += 1
 
@@ -520,5 +508,6 @@ if __name__ == '__main__':
     if args.test:
         sys.exit()
 
+    print('\nsimulating fastq formatted sequence reads\n')
     write_reads(proj, sampled_file)
 

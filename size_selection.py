@@ -50,10 +50,10 @@ def modify_length(df, args):
     if args.a1 and args.a2:
         a1_avg = sum([len(i) for i in args.a1.keys()]) / len(args.a1.keys())
         a2_avg = sum([len(i) for i in args.a2.keys()]) / len(args.a2.keys())
-        modifier = a1_avg + a2_avg
+        modifier = round(a1_avg + a2_avg)
     elif args.a1:
         a1_avg = sum([len(i) for i in args.a1.keys()]) / len(args.a1.keys())
-        modifier = 2 * a1_avg
+        modifier = round(2 * a1_avg)
     else:
         modifier = 0
 
