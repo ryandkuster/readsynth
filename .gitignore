@@ -1,10 +1,13 @@
+# ignore these:
 /raw_data/*
-!/raw_data/adapters/
-*fastq
-*tiff
 /tests/test_project*
-*swp
 /.vscode/*
 /.idea/*
-.DS_Store
 __pycache__/
+.DS_Store
+*fastq
+*tiff
+*swp
+
+# allow these:
+!/raw_data/adapters/
