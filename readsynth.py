@@ -12,6 +12,7 @@ import sys
 import time
 
 import n_copies
+import prob_n_copies #TODO
 import digest_genomes
 import size_selection
 
@@ -497,7 +498,8 @@ if __name__ == '__main__':
     save_hist(proj, digest_file, 'Possible Raw Fragments', 'possible')
 
     print('\nsimulating genome copy number\n')
-    dup_file = n_copies.main(proj, digest_file, args)
+    dup_file = n_copies.main(proj, digest_file, args) #TODO
+    #dup_file = prob_n_copies.main(proj, digest_file, args) #TODO
     save_hist(proj, dup_file, f'Fragments of {args.n}X Copy Number', \
               f'{args.n} copies')
 

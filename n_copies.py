@@ -122,7 +122,7 @@ def add_copies(df, master_dt):
     draw a forward or reverse fragment
     '''
     copy_dt = {}
-    df['copies'] = 0 
+    df['copies'] = 0
 
     for pos, count in master_dt.items():
         hits = (df.index[(df['start'] == pos[0]) & (df['end'] == pos[1])].tolist())
