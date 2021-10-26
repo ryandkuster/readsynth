@@ -191,6 +191,7 @@ def reverse_comp(seq):
 
 
 def process_df(df, digest_file):
+    print(df.head())
     df['length'] = df['seq'].str.len()
     df['forward'] = np.where((df['m1'].isin(motif_dt1.keys()) & \
                              df['m2'].isin(motif_dt2.keys())), 1, 0)
@@ -498,8 +499,8 @@ if __name__ == '__main__':
     save_hist(proj, digest_file, 'Possible Raw Fragments', 'possible')
 
     print('\nsimulating genome copy number\n')
-    dup_file = n_copies.main(proj, digest_file, args) #TODO
-    #dup_file = prob_n_copies.main(proj, digest_file, args) #TODO
+    #dup_file = n_copies.main(proj, digest_file, args) #TODO
+    dup_file = prob_n_copies.main(proj, digest_file, args) #TODO
     save_hist(proj, dup_file, f'Fragments of {args.n}X Copy Number', \
               f'{args.n} copies')
 

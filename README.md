@@ -6,8 +6,7 @@ Readsynth is a series of python scripts that simulate reduced-representation seq
 Readsynth is aimed at standardizing reduced-metagenome sequencing (RMS) libraries, where diverse community members are expected to yield differences in abundance due to molecular sequencing preparation.
 
 ## what makes readsynth different?
-The preparation of DNA sequencing libraries include many variables which influence the frequency of a given read, including restriction enzyme site frequency in the sample genome(s), enzyme digestion efficiency, size-selection, as well as PCR bias based on DNA fragment length. Readsynth allows users to control
-(e.g. RADseq, ddRADseq, GBS, etc.)
+The preparation of DNA sequencing libraries include many variables which influence the frequency of a given read, including restriction enzyme site frequency in the sample genome(s), enzyme digestion efficiency, size-selection, as well as PCR bias based on DNA fragment length. Readsynth allows users to control common sources of variability introduced in typical enzymatic library preparations (e.g. RADseq, ddRADseq, GBS, etc.).
 
 ## usage
 
@@ -28,7 +27,7 @@ The preparation of DNA sequencing libraries include many variables which influen
 ```
 readsynth.py -genome reference.fasta -m1 G/AATTC -m2 T/TAA -n 10000 -cut_prob 0.90 -mean 300 -sd 100 -l 100 -o /output_directory
 ```
-The above example takes 'reference.fasta' as a **genome** to be digested with EcoRI (**m1**) and MseI (**m2**) in a strand-specific fashion (e.g. the forward adapter ligates with the /ATTC overhang from EcoRI). Assuming 10,000 genomic copies (**n**) of the genome, digest simulation will calculate the expected number of DNA fragments given the enzyme digestion efficiency (**cut_prob**) occurs at a probability of 90% at any random RE motif. The resulting fragments will be size-selected using a normal distribution defined by **mean** and **sd**. Paired-end Illumina reads of length (**l**) will be written to a simulated fastq file (default output has perfect scores).
+The above example takes 'reference.fasta' as a **genome** to be digested with EcoRI (**m1**) and MseI (**m2**) in a strand-specific fashion (e.g. the forward adapter ligates with the /AATTC overhang from EcoRI). Assuming 10,000 genomic copies (**n**) of the genome, digest simulation will calculate the expected number of DNA fragments given the enzyme digestion efficiency (**cut_prob**) occurs at a probability of 90% at any random RE motif. The resulting fragments will be size-selected using a normal distribution defined by **mean** and **sd**. Paired-end Illumina reads of length (**l**) will be written to a simulated fastq file (default output has perfect scores).
 
 ## input options
 - genome  - path to file genome

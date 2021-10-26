@@ -40,7 +40,7 @@ def main(motif_dt, frag_len, args):
     begin += len(seq)
     fasta.close()
 
-    df = pd.DataFrame(gen_ls, columns=['seq', 'start', 'end', 'm1', 'm2'])
+    df = pd.DataFrame(gen_ls, columns=['seq', 'start', 'end', 'm1', 'm2', 'internal'])
 
     return df
 
@@ -67,16 +67,17 @@ def digest_frag(fragment, motif_dt, motif1, f_start):
     further search each RE starting point + frag_len for more
     RE sites, return list of seq, start, end, m1, m2
     '''
-    frag_ls, end_ls = [], []
+    frag_ls  = []
 
     for motif2 in motif_dt.keys():
-        for idx in re.finditer('(?=' + motif2 + ')', fragment[1:]):
+        for i, idx in enumerate(re.finditer('(?=' + motif2 + ')', fragment[1:])):
             end = idx.start()+1
             frag_ls.append([fragment[:end+len(motif2)],
                             f_start,
                             f_start+end,
                             motif1,
-                            motif2])
+                            motif2,
+                            i])
 
     return frag_ls
 

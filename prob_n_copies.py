@@ -14,8 +14,11 @@ def main(proj, digest_file, args):
     # get set of all unique restriction site positions
     site_ls = list(set(df['start'].tolist() + df['end'].tolist()))
     site_ls.sort()
+
+    print('defining fragments')
     master_dt = define_fragments(site_ls, args.max, args.cut_prob, args.n)
 
+    print('adding copies')
     df = add_copies(df, master_dt)
 
     dup_file = os.path.join(proj, 'copies_' + os.path.basename(args.genome) + '.csv')
