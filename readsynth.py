@@ -191,7 +191,6 @@ def reverse_comp(seq):
 
 
 def process_df(df, digest_file):
-    print(df.head())
     df['length'] = df['seq'].str.len()
     df['forward'] = np.where((df['m1'].isin(motif_dt1.keys()) & \
                              df['m2'].isin(motif_dt2.keys())), 1, 0)
@@ -247,17 +246,13 @@ def process_df(df, digest_file):
 def save_hist(proj, read_file, title, leglab):
     df = pd.read_csv(read_file)
 
-    length_ls = []
     if 'counts'  in [col for col in df]:
-        for idx, row in df.iterrows():
-            length_ls.extend([row['full_length'] for i in range(row['counts'])])
+        plt.hist(df['full_length'].tolist(), weights=df['counts'].tolist(), bins=100, range=[0, args.max], label=leglab, alpha=0.75)
     elif 'copies' in [col for col in df]:
-        for idx, row in df.iterrows():
-            length_ls.extend([row['length'] for i in range(row['copies'])])
+        plt.hist(df['length'].tolist(), weights=df['copies'].tolist(), bins=100, range=[0, args.max], label=leglab, alpha=0.75)
     else:
-        length_ls = df['length'].to_list()
+        plt.hist(df['length'].tolist(), bins=100, range=[0, args.max], label=leglab, alpha=0.75)
 
-    plt.hist(length_ls, bins=100, range=[0, args.max], label=leglab, alpha=0.75)
     plt.xlabel('Fragment Length')
     plt.ylabel('Count')
     plt.title('Distribution of ' + title)

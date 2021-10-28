@@ -22,12 +22,15 @@ def main(dup_file, proj, args):
 
     df = modify_length(df, args)
     len_dt, total_reads = length_dict(df, args)
+    print('len dict')
     draw_ls = normal_distribution(args, len_dt, total_reads)
+    print('norm dist')
     draw_dt = draw_dict(df, draw_ls)
+    print('draw dict')
     sampled_df = draw_reads(df, col_names, draw_dt)
 
     #TODO the sampled file is now complete
-
+    print('reads drawn')
     index_names = sampled_df[sampled_df['counts'] == 0].index
     sampled_df.drop(index_names, inplace=True)
     samp_no = sampled_df['counts'].sum()
@@ -71,7 +74,7 @@ def length_dict(df, args):
     len_dt = {}
     for i in range(args.mean, args.mean + 2*args.sd):
         len_dt[i] = df[df.full_length == i]['copies'].sum()
-    total_reads = sum(len_dt.values())
+    total_reads = sum(len_dt.values()) * 2
 
     return len_dt, total_reads
 
@@ -84,6 +87,7 @@ def normal_distribution(args, len_dt, total_reads):
 
     while keep_going is True:
         keep_going = False
+        print(total_reads)
         draw_ls = np.random.normal(loc=args.mean,scale=args.sd,size=total_reads)
         draw_ls = [round(i) for i in draw_ls]
         for i, len_count in len_dt.items():
