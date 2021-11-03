@@ -21,22 +21,19 @@ def main(dup_file, proj, args):
         sys.exit('no fragments produced with current settings')
 
     df = modify_length(df, args)
-    len_dt, total_reads = length_dict(df, args)
-    print('len dict')
-    draw_ls = normal_distribution(args, len_dt, total_reads)
-    print('norm dist')
-    draw_dt = draw_dict(df, draw_ls)
-    print('draw dict')
+    len_dt = length_dict(df, args.mean, args.sd)
+    a = [len_dt[i] for i in range(args.mean, (args.up_bound+(args.up_bound-args.mean))+1)]
+    avg_upper = sum(a)/len(a)
+    scale_by = avg_upper/gauss_pdf(args.mean, args.sd, args.up_bound)
+    draw_dt = get_draw_dict(args.mean, args.sd, len_dt, scale_by)
     sampled_df = draw_reads(df, col_names, draw_dt)
 
-    #TODO the sampled file is now complete
-    print('reads drawn')
     index_names = sampled_df[sampled_df['counts'] == 0].index
     sampled_df.drop(index_names, inplace=True)
     samp_no = sampled_df['counts'].sum()
     print(f'fragments sampled around mean of {args.mean}bp : {samp_no}')
     sampled_df.reset_index(inplace=True, drop=True)
-    sampled_file = os.path.join(proj, 'sampled_' + os.path.basename(args.genome)     + '.csv')
+    sampled_file = os.path.join(proj, 'sampled_' + os.path.basename(args.genome) + '.csv')
     sampled_df.to_csv(sampled_file, index=None)
 
     return sampled_file
@@ -67,48 +64,36 @@ def modify_length(df, args):
     return df
 
 
-def length_dict(df, args):
+def gauss_pdf(mean, sd, x):
+    '''
+    return the probability density of x from a normal distribution
+    note: the sum of pdf for all points x = 1
+    '''
+    pdf = (1/sd*np.sqrt(2*np.pi))*np.exp((-1/2)*((x-mean)/sd)**2)
+    return pdf
+
+
+def length_dict(df, mean, sd):
     '''
     create a len_dt, storing the count for each length
     '''
     len_dt = {}
-    for i in range(args.mean, args.mean + 2*args.sd):
+    for i in range(0, mean + sd*6 + 1):
         len_dt[i] = df[df.full_length == i]['copies'].sum()
-    total_reads = sum(len_dt.values()) * 2
 
-    return len_dt, total_reads
-
-
-def normal_distribution(args, len_dt, total_reads):
-    '''
-    produce a normal distribution that includes mean + 2sd counts
-    '''
-    keep_going = True
-
-    while keep_going is True:
-        keep_going = False
-        print(total_reads)
-        draw_ls = np.random.normal(loc=args.mean,scale=args.sd,size=total_reads)
-        draw_ls = [round(i) for i in draw_ls]
-        for i, len_count in len_dt.items():
-            if len_count > draw_ls.count(i):
-                total_reads = round(total_reads*1.1)
-                keep_going = True
-                break
-
-    return draw_ls
+    return len_dt
 
 
-def draw_dict(df, draw_ls):
+def get_draw_dict(mean, sd, len_dt, scale_by):
     '''
     create a dictionary of draw numbers
     '''
     draw_dt = {}
 
-    for i in range(min(draw_ls), max(draw_ls)+1):
-        draw_counts = draw_ls.count(i)
-        data_counts = df[df.full_length == i]['copies'].sum()
-        draw_dt[i] = min(draw_counts, data_counts)
+    for x in range(0, mean + 6*sd + 1):
+        draw_counts = int(round(gauss_pdf(mean, sd, x)*scale_by, 0))
+        data_counts = len_dt[x]
+        draw_dt[x] = int(round(min(draw_counts, data_counts)*0.65, 0)) #TODO average recovery
 
     return draw_dt
 
@@ -130,6 +115,8 @@ def draw_reads(df, col_names, draw_dt):
         sampled_df = pd.concat([sampled_df, tmp_df])
 
     sampled_df['counts'] = counts
+    sampled_df['counts'] = sampled_df['counts'].astype(int)
+    sampled_df['full_length'] = sampled_df['full_length'].astype(int)
 
     return sampled_df
 

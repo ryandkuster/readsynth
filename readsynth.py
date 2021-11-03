@@ -47,8 +47,8 @@ def parse_user_input():
     parser.add_argument('-mean', type=int, required=True,
             help='mean (in bp) of read lengths after size selection')
 
-    parser.add_argument('-sd', type=int, required=True,
-            help='standard deviation (in bp) of read lengths after size selection')
+    parser.add_argument('-up_bound', type=int, required=True,
+            help='the upper end of a range (in bp) of read lengths to size select')
 
     parser.add_argument('-min', type=int, required=False,
             help='min distance between cuts (optional, defaults to 6bp)')
@@ -247,11 +247,17 @@ def save_hist(proj, read_file, title, leglab):
     df = pd.read_csv(read_file)
 
     if 'counts'  in [col for col in df]:
-        plt.hist(df['full_length'].tolist(), weights=df['counts'].tolist(), bins=100, range=[0, args.max], label=leglab, alpha=0.75)
+        plt.hist(df['full_length'], weights=df['counts'],
+                 bins=(df['full_length'].max() - df['full_length'].min()),
+                 label=leglab, alpha=0.75) #TODO
     elif 'copies' in [col for col in df]:
-        plt.hist(df['length'].tolist(), weights=df['copies'].tolist(), bins=100, range=[0, args.max], label=leglab, alpha=0.75)
+        plt.hist(df['length'].tolist(), weights=df['copies'].tolist(),
+                 bins=(df['length'].max() - df['length'].min()),
+                 label=leglab, alpha=0.75)
     else:
-        plt.hist(df['length'].tolist(), bins=100, range=[0, args.max], label=leglab, alpha=0.75)
+        plt.hist(df['length'],
+                 bins=(df['length'].max() - df['length'].min()),
+                 label=leglab, alpha=0.75)
 
     plt.xlabel('Fragment Length')
     plt.ylabel('Count')
@@ -447,6 +453,8 @@ if __name__ == '__main__':
     motif_dt.update(motif_dt2)
 
     args.t = args.t if args.t else 1
+    args.sd = int(round(0.08*args.mean, 0)) # using Sage Science CV of 8%
+    args.sd = max(args.sd, int(round((args.up_bound - args.mean)/2, 0)))
     args.min = args.min if args.min else 6
     args.max = args.max if args.max else (args.mean + (6*args.sd))
     frag_len = args.max
@@ -494,7 +502,6 @@ if __name__ == '__main__':
     save_hist(proj, digest_file, 'Possible Raw Fragments', 'possible')
 
     print('\nsimulating genome copy number\n')
-    #dup_file = n_copies.main(proj, digest_file, args) #TODO
     dup_file = prob_n_copies.main(proj, digest_file, args) #TODO
     save_hist(proj, dup_file, f'Fragments of {args.n}X Copy Number', \
               f'{args.n} copies')
