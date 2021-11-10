@@ -27,6 +27,10 @@ def main(proj, digest_file, args):
 
 
 def copies_dict(internal_max, cut_prob, n):
+    '''
+    return a dictionary of expected copies for a fragment
+    given the fragment contains i internal cut sites
+    '''
     copies_dt = {}
 
     for i in range(internal_max+1):

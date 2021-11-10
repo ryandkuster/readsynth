@@ -182,7 +182,10 @@ def reverse_comp(seq):
     '''
     return the reverse complement of an input sequence
     '''
-    revc = {'A': 'T', 'C': 'G', 'G': 'C', 'T': 'A', 'N': 'N'}
+    revc = {'A': 'T', 'C': 'G', 'G': 'C', 'T': 'A',
+            'R': 'Y', 'Y': 'R', 'S': 'S', 'W': 'W', 'K': 'M', 'M': 'K',
+            'B': 'V', 'D': 'H', 'H': 'D', 'V': 'B',
+            'N': 'N'}
     new = ''
     for base in reversed(seq):
         new += revc[base]
@@ -496,23 +499,23 @@ if __name__ == '__main__':
         # this would only temporarily store sequences in the raw digest
         # raw digests (per chromosome) will be digested and stored as copies
 
-    print('\nsimulating restriction digest\n')
+    print('simulating restriction digest')
     df = digest_genomes.main(motif_dt, frag_len, args)
     digest_file  = process_df(df, digest_file)
     save_hist(proj, digest_file, 'Possible Raw Fragments', 'possible')
 
-    print('\nsimulating genome copy number\n')
+    print('simulating genome copy number')
     dup_file = prob_n_copies.main(proj, digest_file, args) #TODO
     save_hist(proj, dup_file, f'Fragments of {args.n}X Copy Number', \
               f'{args.n} copies')
 
-    print('\nsimulating size selection\n')
+    print('nsimulating size selection')
     sampled_file = size_selection.main(dup_file, proj, args)
     save_hist(proj, sampled_file, 'Size Selected Fragments', 'size selected')
 
     if args.test:
         sys.exit()
 
-    print('\nsimulating fastq formatted sequence reads\n')
+    print('simulating fastq formatted sequence reads')
     write_reads(proj, sampled_file)
 

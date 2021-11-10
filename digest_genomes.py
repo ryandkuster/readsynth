@@ -72,13 +72,24 @@ def digest_frag(fragment, motif_dt, motif1, f_start):
     for motif2 in motif_dt.keys():
         for i, idx in enumerate(re.finditer('(?=' + motif2 + ')', fragment[1:])):
             end = idx.start()+1
+            internals = internal_sites(fragment[1:end+len(motif2)-1], motif_dt.keys())
             frag_ls.append([fragment[:end+len(motif2)],
                             f_start,
                             f_start+end,
                             motif1,
                             motif2,
-                            i])
+                            internals])
 
     return frag_ls
+
+
+def internal_sites(subseq, all_motifs):
+    internals = 0
+    for motif3 in all_motifs:
+        hits = [m.start() for m in re.finditer('(?=' + motif3 + ')', subseq)]
+        internals += len(hits)
+
+    return internals
+
 
 
