@@ -19,7 +19,7 @@ def main(proj, digest_file, args):
     df = apply_approach(df, copies_dt)
 
     dup_file = os.path.join(proj, 'copies_' + os.path.basename(args.genome) + '.csv')
-    df.drop(df[df['copies'] == 0].index, inplace = True)
+    df.drop(df[df['probability'] == 0].index, inplace = True)
     df = df.reset_index(drop=True)
     df.to_csv(dup_file, index=None)
 
@@ -28,20 +28,19 @@ def main(proj, digest_file, args):
 
 def copies_dict(internal_max, cut_prob, n):
     '''
-    return a dictionary of expected copies for a fragment
+    return a dictionary of expected probabilities for a fragment
     given the fragment contains i internal cut sites
     '''
     copies_dt = {}
 
     for i in range(internal_max+1):
-        frequency = (cut_prob**2) * ((1-cut_prob)**i)
-        copies_dt[i] = round(frequency * n)
+        copies_dt[i] = (cut_prob**2) * ((1-cut_prob)**i)
 
     return copies_dt
 
 
 def apply_approach(df, copies_dt):
-    df['copies'] = df.apply(
+    df['probability'] = df.apply(
         lambda row: get_copies(copies_dt, internal=row['internal']), axis=1)
 
     return df

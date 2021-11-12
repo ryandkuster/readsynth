@@ -75,11 +75,11 @@ def gauss_pdf(mean, sd, x):
 
 def length_dict(df, mean, sd):
     '''
-    create a len_dt, storing the count for each length
+    create a len_dt, storing the combined probability for each length
     '''
     len_dt = {}
     for i in range(0, mean + sd*6 + 1):
-        len_dt[i] = df[df.full_length == i]['copies'].sum()
+        len_dt[i] = df[df.full_length == i]['probability'].sum()
 
     return len_dt
 
@@ -91,9 +91,9 @@ def get_draw_dict(mean, sd, len_dt, scale_by):
     draw_dt = {}
 
     for x in range(0, mean + 6*sd + 1):
-        draw_counts = int(round(gauss_pdf(mean, sd, x)*scale_by, 0))
+        draw_counts = gauss_pdf(mean, sd, x)*scale_by
         data_counts = len_dt[x]
-        draw_dt[x] = int(round(min(draw_counts, data_counts)*0.65, 0)) #TODO average recovery
+        draw_dt[x] = min(draw_counts, data_counts)*0.65 #TODO average recovery
 
     return draw_dt
 
@@ -106,6 +106,7 @@ def draw_reads(df, col_names, draw_dt):
     counts = []
 
     for length, draws in draw_dt.items():
+        draws = int(round(draws,0)) #TODO
         tmp_df = df.loc[df['full_length'] == length]
         if len(tmp_df) == 0:
             continue

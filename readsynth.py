@@ -6,12 +6,12 @@ import matplotlib.pyplot as plt
 import numpy as np
 import os
 import pandas as pd
+import pickle
 import random
 import re
 import sys
 import time
 
-import n_copies
 import prob_n_copies #TODO
 import digest_genomes
 import size_selection
@@ -89,6 +89,14 @@ def parse_user_input():
     args = parser.parse_args()
 
     return args
+
+
+def check_for_enzymes():
+    with open(os.path.join(os.path.dirname(__file__),
+              'resources/type_ii_enzymes.pickle'), 'rb') as type_ii_file:
+        re_dt = pickle.load(type_ii_file)
+    args.m1 = [re_dt[i] if i.lower() in re_dt.keys() else i for i in args.m1]
+    args.m2 = [re_dt[i] if i.lower() in re_dt.keys() else i for i in args.m2]
 
 
 def iupac_motifs(arg_m):
@@ -253,8 +261,8 @@ def save_hist(proj, read_file, title, leglab):
         plt.hist(df['full_length'], weights=df['counts'],
                  bins=(df['full_length'].max() - df['full_length'].min()),
                  label=leglab, alpha=0.75) #TODO
-    elif 'copies' in [col for col in df]:
-        plt.hist(df['length'].tolist(), weights=df['copies'].tolist(),
+    elif 'probability' in [col for col in df]:
+        plt.hist(df['length'].tolist(), weights=df['probability'].tolist(),
                  bins=(df['length'].max() - df['length'].min()),
                  label=leglab, alpha=0.75)
     else:
@@ -449,6 +457,7 @@ if __name__ == '__main__':
     else:
         sys.exit('directory not found at ' + os.path.abspath(args.o))
 
+    check_for_enzymes()
     motif_dt = {}
     motif_dt1 = iupac_motifs(args.m1)
     motif_dt.update(motif_dt1)
@@ -505,11 +514,11 @@ if __name__ == '__main__':
     save_hist(proj, digest_file, 'Possible Raw Fragments', 'possible')
 
     print('simulating genome copy number')
-    dup_file = prob_n_copies.main(proj, digest_file, args) #TODO
+    dup_file = prob_n_copies.main(proj, digest_file, args)
     save_hist(proj, dup_file, f'Fragments of {args.n}X Copy Number', \
               f'{args.n} copies')
 
-    print('nsimulating size selection')
+    print('simulating size selection')
     sampled_file = size_selection.main(dup_file, proj, args)
     save_hist(proj, sampled_file, 'Size Selected Fragments', 'size selected')
 
