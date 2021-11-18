@@ -248,7 +248,6 @@ def process_df(df, digest_file):
         df.loc[(df['m2'] == mot) & (df['reverse'] == 1), 'seq'] = \
                 df['seq'].str[front:]
 
-    #TODO readjust length?
     df.to_csv(digest_file, index=None)
 
     return digest_file
@@ -256,6 +255,8 @@ def process_df(df, digest_file):
 
 def save_hist(proj, read_file, title, leglab):
     df = pd.read_csv(read_file)
+    if df.shape[0] == 0:
+        sys.exit(f'no fragments found in {read_file}, exiting')
 
     if 'counts'  in [col for col in df]:
         plt.hist(df['full_length'], weights=df['counts'],
