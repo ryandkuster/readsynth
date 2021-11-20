@@ -7,36 +7,44 @@ import random
 import sys
 
 
-def main(dup_file, proj, args):
+def main(df, proj, args):
     """
     sampling is performed by first assessing the count of fragments for
     each possible read length and then generating a normal distribution
     that includes enough counts in the mean+2sd range to include a 1X
     coverage of the genome
     """
-    df = pd.read_csv(dup_file)
-    col_names = [col for col in df.columns]
 
     if len(df) == 0:
         sys.exit('no fragments produced with current settings')
 
-    df = modify_length(df, args)
+    modify_length(df, args)
+
     len_dt = length_dict(df, args.mean, args.sd)
+
     a = [len_dt[i] for i in range(args.mean, (args.up_bound+(args.up_bound-args.mean))+1)]
     avg_upper = sum(a)/len(a)
     scale_by = avg_upper/gauss_pdf(args.mean, args.sd, args.up_bound)
     draw_dt = get_draw_dict(args.mean, args.sd, len_dt, scale_by)
-    sampled_df = draw_reads(df, col_names, draw_dt)
+    adjustment = args.n / sum(draw_dt.values()) #TODO
+    fragment_comps = {}
 
-    index_names = sampled_df[sampled_df['counts'] == 0].index
-    sampled_df.drop(index_names, inplace=True)
-    samp_no = sampled_df['counts'].sum()
-    print(f'fragments sampled around mean of {args.mean}bp : {samp_no}')
-    sampled_df.reset_index(inplace=True, drop=True)
-    sampled_file = os.path.join(proj, 'sampled_' + os.path.basename(args.genome) + '.csv')
-    sampled_df.to_csv(sampled_file, index=None)
+    for i in range(0, (args.up_bound+(args.up_bound-args.mean))+1):
+        fragment_comps[i] = draw_dt[i] / len_dt[i]
 
-    return sampled_file
+    return fragment_comps, adjustment
+
+    # sampled_df = draw_reads(df, col_names, draw_dt)
+
+    # index_names = sampled_df[sampled_df['counts'] == 0].index
+    # sampled_df.drop(index_names, inplace=True)
+    # samp_no = sampled_df['counts'].sum()
+    # print(f'fragments sampled around mean of {args.mean}bp : {samp_no}')
+    # sampled_df.reset_index(inplace=True, drop=True)
+    # sampled_file = os.path.join(proj, 'sampled_' + os.path.basename(args.genome) + '.csv')
+    # sampled_df.to_csv(sampled_file, index=None)
+
+    # return sampled_file
 
 
 def modify_length(df, args):
@@ -57,11 +65,8 @@ def modify_length(df, args):
     else:
         modifier = 0
 
-    df['full_length'] = df['length'] + modifier
-    df.sort_values(['full_length'], ascending=[True], inplace=True)
-    df.reset_index(inplace=True, drop=True)
-
-    return df
+    args.mean -= modifier
+    args.up_bound -= modifier
 
 
 def gauss_pdf(mean, sd, x):
@@ -79,7 +84,7 @@ def length_dict(df, mean, sd):
     '''
     len_dt = {}
     for i in range(0, mean + sd*6 + 1):
-        len_dt[i] = df[df.full_length == i]['probability'].sum()
+        len_dt[i] = df[df.length == i]['sum_prob'].sum()
 
     return len_dt
 

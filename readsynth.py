@@ -9,6 +9,7 @@ import pandas as pd
 import pickle
 import random
 import re
+import seaborn as sns
 import sys
 import time
 
@@ -186,6 +187,51 @@ def open_fastq(fastq):
                 i = 0
 
 
+def check_genomes(genome_file):
+    df = pd.read_csv(genome_file, names=['genome', 'abundance'])
+    df['abundance'] = df['abundance'] / df['abundance'].sum()
+
+    for idx in range(df.shape[0]):
+        genome = df.iloc[idx]['genome']
+        assert os.path.exists(genome), f'path to {genome} not found'
+
+    return df
+
+
+def process_genomes(genomes_df):
+    digest_ls, prob_ls = [], []
+    total_freqs = pd.DataFrame(columns=['length', 'sum_prob', 'name'])
+
+    for idx in range(genomes_df.shape[0]):
+        args.genome = genomes_df.iloc[idx]['genome']
+        args.comp = genomes_df.iloc[idx]['abundance']
+        digest_file = os.path.join(proj, 'raw_digest_' + os.path.basename(args.genome) + '.csv')
+
+        print(f'processing genome {idx+1}')
+        df = digest_genomes.main(motif_dt, frag_len, args)
+        digest_file  = process_df(df, digest_file)
+        prob_file, len_freqs = prob_n_copies.main(proj, digest_file, args)
+
+        # TODO #TODO #TODO #TODO #TODO
+        save_hist(digest_file, 'length' , 'length', 'possible')
+        save_hist(prob_file, 'length', 'probability', f'{1}X abundance')
+        save_hist(prob_file, 'length', 'adj_prob', f'{args.comp}X abundance')
+        plt.savefig(os.path.join(proj, 'hist_' + os.path.basename(prob_file)[:-4] + '.png'), facecolor='white', transparent=False)
+        plt.close()
+        # TODO #TODO #TODO #TODO #TODO ADD SINGLE STEP
+
+        digest_ls.append(digest_file)
+        prob_ls.append(prob_file)
+        tmp_df = pd.DataFrame(len_freqs.items(), columns=['length', 'sum_prob'])
+        tmp_df['name'] = os.path.basename(args.genome)[:-4]
+        total_freqs = pd.concat([total_freqs, tmp_df], axis=0)
+
+    genomes_df['digest_file'] = digest_ls
+    genomes_df['prob_file'] = prob_ls
+
+    return genomes_df, total_freqs
+
+
 def reverse_comp(seq):
     '''
     return the reverse complement of an input sequence
@@ -253,30 +299,22 @@ def process_df(df, digest_file):
     return digest_file
 
 
-def save_hist(proj, read_file, title, leglab):
+def save_hist(read_file, target, weights, leglab):
     df = pd.read_csv(read_file)
     if df.shape[0] == 0:
-        sys.exit(f'no fragments found in {read_file}, exiting')
+        print(f'no fragments found in {read_file}')
+        return
 
-    if 'counts'  in [col for col in df]:
-        plt.hist(df['full_length'], weights=df['counts'],
-                 bins=(df['full_length'].max() - df['full_length'].min()),
-                 label=leglab, alpha=0.75) #TODO
-    elif 'probability' in [col for col in df]:
-        plt.hist(df['length'].tolist(), weights=df['probability'].tolist(),
-                 bins=(df['length'].max() - df['length'].min()),
-                 label=leglab, alpha=0.75)
+    if 'probability' in [col for col in df]:
+        plt.hist(df[target], weights=df[weights],
+             bins=(df[target].max() - df[target].min()),
+             label=leglab, alpha=0.75)
     else:
         plt.hist(df['length'],
                  bins=(df['length'].max() - df['length'].min()),
                  label=leglab, alpha=0.75)
 
-    plt.xlabel('Fragment Length')
-    plt.ylabel('Count')
-    plt.title('Distribution of ' + title)
     plt.legend()
-    plt.savefig(os.path.join(proj, 'hist_' + os.path.basename(read_file)[:-4] \
-                + '.png'), facecolor='white', transparent=False)
 
 
 def write_reads(proj, sampled_file):
@@ -502,26 +540,29 @@ if __name__ == '__main__':
     if args.r2:
         open_fastq(args.r2)
 
-    digest_file = os.path.join(proj, 'raw_digest_' + os.path.basename(args.genome) + '.csv')
+    genomes_df = check_genomes(args.genome)
+    genomes_df, total_freqs = process_genomes(genomes_df)
+    sns.histplot(data=total_freqs, x=total_freqs['length'], hue=total_freqs['name'], weights=total_freqs['sum_prob'], palette="viridis", multiple="stack", bins=100, element="step")
+    plt.legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.)
+    plt.savefig('test.pdf')
 
     #TODO add option to input existing digest_file and skip digest_genome
     #TODO consider chromosome by chromosome approach
         # this would only temporarily store sequences in the raw digest
         # raw digests (per chromosome) will be digested and stored as copies
 
-    print('simulating restriction digest')
-    df = digest_genomes.main(motif_dt, frag_len, args)
-    digest_file  = process_df(df, digest_file)
-    save_hist(proj, digest_file, 'Possible Raw Fragments', 'possible')
-
-    print('simulating genome copy number')
-    dup_file = prob_n_copies.main(proj, digest_file, args)
-    save_hist(proj, dup_file, f'Fragments of {args.n}X Copy Number', \
-              f'{args.n} copies')
-
     print('simulating size selection')
-    sampled_file = size_selection.main(dup_file, proj, args)
-    save_hist(proj, sampled_file, 'Size Selected Fragments', 'size selected')
+    #sampled_file = size_selection.main(total_freqs, proj, args)
+    #save_hist(proj, sampled_file, 'Size Selected Fragments', 'size selected')
+
+    fragment_comps, adjustment = size_selection.main(total_freqs, proj, args)
+    total_freqs['test'] = total_freqs['length'].map(fragment_comps)
+    total_freqs['test'] = round(total_freqs['test'] * total_freqs['sum_prob'] * adjustment)
+    sns.histplot(data=total_freqs, x=total_freqs['length'], hue=total_freqs['name'], weights=total_freqs['test'], palette="viridis", multiple="stack", bins=100, element="step")
+    plt.legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.)
+    plt.savefig('test2.pdf')
+    print(total_freqs['test'].sum())
+    sys.exit() #TODO #TODO #TODO #TODO #TODO
 
     if args.test:
         sys.exit()
