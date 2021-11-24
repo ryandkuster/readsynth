@@ -13,7 +13,7 @@ import seaborn as sns
 import sys
 import time
 
-import prob_n_copies #TODO
+import prob_n_copies
 import digest_genomes
 import size_selection
 
@@ -92,15 +92,23 @@ def parse_user_input():
     return args
 
 
-def check_for_enzymes():
+def check_for_enzymes(args):
     with open(os.path.join(os.path.dirname(__file__),
               'resources/type_ii_enzymes.pickle'), 'rb') as type_ii_file:
         re_dt = pickle.load(type_ii_file)
-    args.m1 = [re_dt[i] if i.lower() in re_dt.keys() else i for i in args.m1]
-    args.m2 = [re_dt[i] if i.lower() in re_dt.keys() else i for i in args.m2]
+
+    m1 = [re_dt[i.lower()] if i.lower() in re_dt.keys() else i for i in args.m1]
+    m2 = [re_dt[i.lower()] if i.lower() in re_dt.keys() else i for i in args.m2]
+
+    return m1, m2
 
 
 def iupac_motifs(arg_m):
+    '''
+    given a list of RE cut motifs, return a dictionary of regex
+    compatible iupac redundancy codes as keys and cleaving site
+    as the value
+    '''
     motif_dt = {}
     iupac_dt = {'/': '',
                 'A': 'A',
@@ -198,32 +206,27 @@ def check_genomes(genome_file):
     return df
 
 
-def process_genomes(genomes_df):
+def process_genomes(args, genomes_df):
     digest_ls, prob_ls = [], []
     total_freqs = pd.DataFrame(columns=['length', 'sum_prob', 'name'])
 
     for idx in range(genomes_df.shape[0]):
         args.genome = genomes_df.iloc[idx]['genome']
         args.comp = genomes_df.iloc[idx]['abundance']
-        digest_file = os.path.join(proj, 'raw_digest_' + os.path.basename(args.genome) + '.csv')
+        digest_file = os.path.join(proj, 'raw_digest_' +
+                os.path.basename(args.genome) + '.csv')
 
-        print(f'processing genome {idx+1}')
-        df = digest_genomes.main(motif_dt, frag_len, args)
+        print(f'processing genome {os.path.basename(args.genome)}')
+        df = digest_genomes.main(motif_dt, args)
         digest_file  = process_df(df, digest_file)
         prob_file, len_freqs = prob_n_copies.main(proj, digest_file, args)
 
-        # TODO #TODO #TODO #TODO #TODO
-        save_hist(digest_file, 'length' , 'length', 'possible')
-        save_hist(prob_file, 'length', 'probability', f'{1}X abundance')
-        save_hist(prob_file, 'length', 'adj_prob', f'{args.comp}X abundance')
-        plt.savefig(os.path.join(proj, 'hist_' + os.path.basename(prob_file)[:-4] + '.png'), facecolor='white', transparent=False)
-        plt.close()
-        # TODO #TODO #TODO #TODO #TODO ADD SINGLE STEP
+        save_individual_hist(prob_file)
 
         digest_ls.append(digest_file)
         prob_ls.append(prob_file)
         tmp_df = pd.DataFrame(len_freqs.items(), columns=['length', 'sum_prob'])
-        tmp_df['name'] = os.path.basename(args.genome)[:-4]
+        tmp_df['name'] = os.path.basename(args.genome)
         total_freqs = pd.concat([total_freqs, tmp_df], axis=0)
 
     genomes_df['digest_file'] = digest_ls
@@ -255,7 +258,8 @@ def process_df(df, digest_file):
                              df['m2'].isin(motif_dt1.keys())), 1, 0)
 
     # remove unviable combos after getting site_ls
-    df.drop(df[(df['forward'] == 0) & (df['reverse'] == 0)].index, inplace = True)
+    df.drop(df[(df['forward'] == 0) & (df['reverse'] == 0)].index,
+            inplace = True)
     df = df.reset_index(drop=True)
 
     # create a column of reverse complement sequences
@@ -299,22 +303,35 @@ def process_df(df, digest_file):
     return digest_file
 
 
-def save_hist(read_file, target, weights, leglab):
-    df = pd.read_csv(read_file)
+def save_individual_hist(prob_file):
+    df = pd.read_csv(prob_file)
     if df.shape[0] == 0:
         print(f'no fragments found in {read_file}')
         return
 
-    if 'probability' in [col for col in df]:
-        plt.hist(df[target], weights=df[weights],
-             bins=(df[target].max() - df[target].min()),
-             label=leglab, alpha=0.75)
-    else:
-        plt.hist(df['length'],
-                 bins=(df['length'].max() - df['length'].min()),
-                 label=leglab, alpha=0.75)
+    sns.histplot(data=df, x=df['length'], binwidth=6,
+                 element="step", alpha=0.75, color='red')
+    sns.histplot(data=df, x=df['length'], weights=df['probability'], binwidth=6,
+                 element="step", alpha=0.75, color='gold')
+    sns.histplot(data=df, x=df['length'], weights=df['adj_prob'], binwidth=6,
+                 element="step", alpha=0.75, color='blue')
+    plt.savefig(os.path.join(proj, 'hist_' + os.path.basename(prob_file)[:-4] +
+                '.png'),
+                 facecolor='white', transparent=False)
+    plt.close()
 
-    plt.legend()
+
+def save_combined_hist(total_freqs, image_name, weights):
+    ax = sns.histplot(data=total_freqs, x='length', hue='name',
+                      weights=total_freqs[weights], multiple="stack",
+                      binwidth=6, element="step")
+    old_legend = ax.legend_
+    handles = old_legend.legendHandles
+    labels = [t.get_text() for t in old_legend.get_texts()]
+    title = old_legend.get_title().get_text()
+    ax.legend(handles, labels, bbox_to_anchor=(1.02, 1), loc='upper left',
+              borderaxespad=0)
+    plt.savefig(os.path.join(proj, f'_{image_name}.pdf'), bbox_inches='tight')
 
 
 def write_reads(proj, sampled_file):
@@ -496,7 +513,7 @@ if __name__ == '__main__':
     else:
         sys.exit('directory not found at ' + os.path.abspath(args.o))
 
-    check_for_enzymes()
+    args.m1, args.m2 = check_for_enzymes(args)
     motif_dt = {}
     motif_dt1 = iupac_motifs(args.m1)
     motif_dt.update(motif_dt1)
@@ -508,7 +525,6 @@ if __name__ == '__main__':
     args.sd = max(args.sd, int(round((args.up_bound - args.mean)/2, 0)))
     args.min = args.min if args.min else 6
     args.max = args.max if args.max else (args.mean + (6*args.sd))
-    frag_len = args.max
 
     if args.r1 and not args.q1:
         sys.exit('please provide q scores profile for R1')
@@ -541,28 +557,17 @@ if __name__ == '__main__':
         open_fastq(args.r2)
 
     genomes_df = check_genomes(args.genome)
-    genomes_df, total_freqs = process_genomes(genomes_df)
-    sns.histplot(data=total_freqs, x=total_freqs['length'], hue=total_freqs['name'], weights=total_freqs['sum_prob'], palette="viridis", multiple="stack", bins=100, element="step")
-    plt.legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.)
-    plt.savefig('test.pdf')
+    genomes_df, total_freqs = process_genomes(args, genomes_df)
 
-    #TODO add option to input existing digest_file and skip digest_genome
-    #TODO consider chromosome by chromosome approach
-        # this would only temporarily store sequences in the raw digest
-        # raw digests (per chromosome) will be digested and stored as copies
-
+    save_combined_hist(total_freqs, 'fragment_distributions', 'sum_prob')
     print('simulating size selection')
-    #sampled_file = size_selection.main(total_freqs, proj, args)
-    #save_hist(proj, sampled_file, 'Size Selected Fragments', 'size selected')
-
     fragment_comps, adjustment = size_selection.main(total_freqs, proj, args)
     total_freqs['test'] = total_freqs['length'].map(fragment_comps)
-    total_freqs['test'] = round(total_freqs['test'] * total_freqs['sum_prob'] * adjustment)
-    sns.histplot(data=total_freqs, x=total_freqs['length'], hue=total_freqs['name'], weights=total_freqs['test'], palette="viridis", multiple="stack", bins=100, element="step")
-    plt.legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.)
-    plt.savefig('test2.pdf')
+    total_freqs['test'] = round(total_freqs['test'] * total_freqs['sum_prob'] \
+                          * adjustment)
     print(total_freqs['test'].sum())
-    sys.exit() #TODO #TODO #TODO #TODO #TODO
+    total_freqs.to_csv('test.csv')
+    save_combined_hist(total_freqs, 'read_distributions', 'test')
 
     if args.test:
         sys.exit()
@@ -570,3 +575,7 @@ if __name__ == '__main__':
     print('simulating fastq formatted sequence reads')
     write_reads(proj, sampled_file)
 
+    #TODO add option to input existing digest_file and skip digest_genome
+    #TODO consider chromosome by chromosome approach
+        # this would only temporarily store sequences in the raw digest
+        # raw digests (per chromosome) will be digested and stored as copies

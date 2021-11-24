@@ -7,7 +7,7 @@ import re
 from scripts.gzip_test import test_unicode
 
 
-def main(motif_dt, frag_len, args):
+def main(motif_dt, args):
     """
     process fasta sequences as restricion enzyme fragments
 
@@ -25,7 +25,7 @@ def main(motif_dt, frag_len, args):
 
     for line in fasta:
         if line.startswith('>') and seq:
-            seq_ls = digest_seq(begin, seq, motif_dt, frag_len)
+            seq_ls = digest_seq(begin, seq, motif_dt, args.max)
             gen_ls.extend(seq_ls)
             begin += len(seq)
             seq = ''
@@ -35,7 +35,7 @@ def main(motif_dt, frag_len, args):
         else:
             seq += line.rstrip().upper()
 
-    seq_ls = digest_seq(begin, seq, motif_dt, frag_len)
+    seq_ls = digest_seq(begin, seq, motif_dt, args.max)
     gen_ls.extend(seq_ls)
     begin += len(seq)
     fasta.close()

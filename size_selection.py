@@ -103,30 +103,6 @@ def get_draw_dict(mean, sd, len_dt, scale_by):
     return draw_dt
 
 
-def draw_reads(df, col_names, draw_dt):
-    '''
-    for each fragment length, randomly draw reads
-    '''
-    sampled_df = pd.DataFrame(columns=col_names)
-    counts = []
-
-    for length, draws in draw_dt.items():
-        draws = int(round(draws,0)) #TODO
-        tmp_df = df.loc[df['full_length'] == length]
-        if len(tmp_df) == 0:
-            continue
-        indices = [i for i in range(len(tmp_df))]
-        sampled_idx = random.choices(indices, k=draws)
-        counts += [sampled_idx.count(idx) for idx in indices]
-        sampled_df = pd.concat([sampled_df, tmp_df])
-
-    sampled_df['counts'] = counts
-    sampled_df['counts'] = sampled_df['counts'].astype(int)
-    sampled_df['full_length'] = sampled_df['full_length'].astype(int)
-
-    return sampled_df
-
-
 if __name__ == '__main__': #TODO add args parse
     dup_file = sys.argv[1]
     proj = sys.argv[2]
