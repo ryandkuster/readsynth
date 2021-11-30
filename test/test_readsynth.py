@@ -13,6 +13,7 @@ usage:
 python3 -m unittest test_readsynth.py
 '''
 
+
 class Variables():
 
     def __init__(self):
@@ -120,22 +121,38 @@ class TestInitFunctions(unittest.TestCase):
         the expected file saved as example_metagenome_df.csv
         '''
         args = Variables()
-        args.genome = 'test_data/example_metagenome_df.csv'
-        expected_df = pd.read_csv(args.genome)
-        df = rs.check_genomes('test_data/example_metagenome.csv')
+        args.genome = 'test_data/example_metagenome.csv'
+        expected_df = pd.read_csv('test_data/example_metagenome_df.csv')
+        df = rs.check_genomes(args.genome)
+        self.assertTrue(expected_df.equals(df))
+
+    def test_check_genomes_2(self):
+        '''
+        given an input df of genome file locations and abundances for
+        each, return df of file locations with abundances identical to
+        the expected file saved as example_metagenome_df.csv
+        '''
+        args = Variables()
+        args.genome = 'test_project3/metagenome_file.csv'
+        expected_df = pd.read_csv('test_project3/metagenome_file_df.csv')
+        df = rs.check_genomes(args.genome)
         self.assertTrue(expected_df.equals(df))
 
 
 class TestProcessing(unittest.TestCase):
-#
-#    def test_process_genomes_1(self):
-#        '''
-#        '''
-#        args = Variables()
-#        args.genome = 
-#        args.proj = 
-#        genomes_df = pd.DataFrame(np.array([['a',1]]))
-#        genomes_df, total_freqs = rs.process_genomes(args, genomes_df)
+
+    def test_process_genomes_1(self):
+        '''
+        '''
+        args = Variables()
+        args.genome = 'test_project3/metagenome_file.csv'
+        args.o = 'test_project3'
+        args.motif_dt = {'TTAA': 1, 'GCGC': 3}
+        args.motif_dt1 = {'TTAA': 1}
+        args.motif_dt2 = {'GCGC': 3}
+        args.cut_prob = 1
+        genomes_df = pd.read_csv('test_project3/metagenome_file_df.csv')
+        genomes_df, total_freqs = rs.process_genomes(args, genomes_df)
 #        self.assertEqual(args.m1[0], expected)
 
     def test_reverse_comp_1(self):
@@ -169,8 +186,8 @@ class TestDigestGenomes(unittest.TestCase):
         pass
         args = Variables()
         args.genome = 'test_project1/fake_genome_1.fasta'
-        motif_dt = {'TTAA': 1}
-        df = dg.main(motif_dt, args)
+        args.motif_dt = {'TTAA': 1}
+        df = dg.main(args)
         self.assertEqual(df.iloc[df[(df['start'] == 25) & (df['end'] == 125)]\
                          .index]['internal'].to_list()[0], 3)
 
@@ -178,15 +195,10 @@ class TestDigestGenomes(unittest.TestCase):
         pass
         args = Variables()
         args.genome = 'test_project2/fake_genome_2.fasta'
-        motif_dt = {'TTAA': 1, 'GCGC': 3}
-        df = dg.main(motif_dt, args)
-
-
-
-
-
-
-
+        args.motif_dt = {'TTAA': 1, 'GCGC': 3}
+        df = dg.main(args)
+        self.assertEqual(df.iloc[df[(df['start'] == 25) & (df['end'] == 75)]\
+                         .index]['internal'].to_list()[0], 1)
 
 
 if __name__ == "__main__":

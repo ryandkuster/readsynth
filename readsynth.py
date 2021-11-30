@@ -208,25 +208,26 @@ def check_genomes(genome_file):
 
 def process_genomes(args, genomes_df):
     digest_ls, prob_ls = [], []
-    total_freqs = pd.DataFrame(columns=['length', 'sum_prob', 'name'])
+    total_freqs = pd.DataFrame(columns=['length', 'sum_prob', 'name', 'counts_file'])
 
     for idx in range(genomes_df.shape[0]):
         args.genome = genomes_df.iloc[idx]['genome']
         args.comp = genomes_df.iloc[idx]['abundance']
-        digest_file = os.path.join(proj, 'raw_digest_' +
+        digest_file = os.path.join(args.o, 'raw_digest_' +
                 os.path.basename(args.genome) + '.csv')
 
         print(f'processing genome {os.path.basename(args.genome)}')
-        df = digest_genomes.main(motif_dt, args)
-        digest_file  = process_df(df, digest_file)
-        prob_file, len_freqs = prob_n_copies.main(proj, digest_file, args)
+        df = digest_genomes.main(args)
+        digest_file  = process_df(df, digest_file, args)
+        prob_file, len_freqs = prob_n_copies.main(digest_file, args)
 
-        save_individual_hist(prob_file)
+        save_individual_hist(prob_file, args)
 
         digest_ls.append(digest_file)
         prob_ls.append(prob_file)
         tmp_df = pd.DataFrame(len_freqs.items(), columns=['length', 'sum_prob'])
         tmp_df['name'] = os.path.basename(args.genome)
+        tmp_df['counts_file'] = prob_file
         total_freqs = pd.concat([total_freqs, tmp_df], axis=0)
 
     genomes_df['digest_file'] = digest_ls
@@ -250,12 +251,12 @@ def reverse_comp(seq):
     return new
 
 
-def process_df(df, digest_file):
+def process_df(df, digest_file, args):
     df['length'] = df['seq'].str.len()
-    df['forward'] = np.where((df['m1'].isin(motif_dt1.keys()) & \
-                             df['m2'].isin(motif_dt2.keys())), 1, 0)
-    df['reverse'] = np.where((df['m1'].isin(motif_dt2.keys()) & \
-                             df['m2'].isin(motif_dt1.keys())), 1, 0)
+    df['forward'] = np.where((df['m1'].isin(args.motif_dt1.keys()) & \
+                             df['m2'].isin(args.motif_dt2.keys())), 1, 0)
+    df['reverse'] = np.where((df['m1'].isin(args.motif_dt2.keys()) & \
+                             df['m2'].isin(args.motif_dt1.keys())), 1, 0)
 
     # remove unviable combos after getting site_ls
     df.drop(df[(df['forward'] == 0) & (df['reverse'] == 0)].index,
@@ -287,7 +288,7 @@ def process_df(df, digest_file):
     df.drop('forward', axis=1, inplace=True)
 
     # add a quick step that removes appropriate over/underhang
-    for mot, front in motif_dt.items():
+    for mot, front in args.motif_dt.items():
         back = len(mot) - front
         df.loc[(df['m1'] == mot) & (df['reverse'] == 0), 'seq'] = \
                 df['seq'].str[front:]
@@ -303,25 +304,25 @@ def process_df(df, digest_file):
     return digest_file
 
 
-def save_individual_hist(prob_file):
+def save_individual_hist(prob_file, args):
     df = pd.read_csv(prob_file)
     if df.shape[0] == 0:
         print(f'no fragments found in {read_file}')
         return
 
     sns.histplot(data=df, x=df['length'], binwidth=6,
-                 element="step", alpha=0.75, color='red')
+                 alpha=0.75, color='red')
     sns.histplot(data=df, x=df['length'], weights=df['probability'], binwidth=6,
-                 element="step", alpha=0.75, color='gold')
+                 alpha=0.75, color='gold')
     sns.histplot(data=df, x=df['length'], weights=df['adj_prob'], binwidth=6,
-                 element="step", alpha=0.75, color='blue')
-    plt.savefig(os.path.join(proj, 'hist_' + os.path.basename(prob_file)[:-4] +
+                 alpha=0.75, color='blue')
+    plt.savefig(os.path.join(args.o, 'hist_' + os.path.basename(prob_file)[:-4] +
                 '.png'),
                  facecolor='white', transparent=False)
     plt.close()
 
 
-def save_combined_hist(total_freqs, image_name, weights):
+def save_combined_hist(total_freqs, image_name, weights, args):
     ax = sns.histplot(data=total_freqs, x='length', hue='name',
                       weights=total_freqs[weights], multiple="stack",
                       binwidth=6, element="step")
@@ -331,65 +332,84 @@ def save_combined_hist(total_freqs, image_name, weights):
     title = old_legend.get_title().get_text()
     ax.legend(handles, labels, bbox_to_anchor=(1.02, 1), loc='upper left',
               borderaxespad=0)
-    plt.savefig(os.path.join(proj, f'_{image_name}.pdf'), bbox_inches='tight')
+    plt.savefig(os.path.join(args.o, f'_{image_name}.pdf'), bbox_inches='tight')
 
 
-def write_reads(proj, sampled_file):
+def write_genomes(comb_file, fragment_comps, adjustment):
+    comb_df = pd.read_csv(comb_file)
+    count_files_ls  = list(set(comb_df['counts_file'].to_list()))
+
+    args.a1 = list(args.a1.items())
+    args.a2 = list(args.a2.items())
+    total = 0 #TODO #TODO #TODO #TODO
+    with open(os.path.join(args.o, 'sim_metagenome_R1.fastq'), 'w') as r1,\
+         open(os.path.join(args.o, 'sim_metagenome_R2.fastq'), 'w') as r2:
+
+        for count_file in count_files_ls:
+            gen_name = os.path.basename(count_file)[7:-4]
+            df = pd.read_csv(count_file)
+            df['counts'] = df['length'].map(fragment_comps)
+            df['counts'] = round(df['counts'] * df['adj_prob'] \
+                                  * adjustment)
+            df.dropna(subset=['counts'], inplace=True)
+            df = df[['seq', 'length', 'counts']]
+            df['counts'] = df['counts'].astype(int)
+            total += df['counts'].sum()
+            write_reads(df, r1, r2, gen_name)
+    print(total)
+
+
+def write_reads(df, r1, r2, gen_name):
     """
     using the sampled read distribution, write to file as fastq format
     if adapters, randomly add sample and concatenate adapters
     if sample fastq data provided, mutate samples for error simulation
     """
-    df = pd.read_csv(sampled_file)
 
-    #TODO add adapters on the fly after size selection
     if not args.a1s:
         args.a1s, args.a2s = 0, 0
 
-    with open(os.path.join(proj, os.path.basename(args.genome) + '_R1.fastq'), 'w') as r1,\
-         open(os.path.join(proj, os.path.basename(args.genome) + '_R2.fastq'), 'w') as r2:
-
-        if args.r1:
-            read_writer_samples(df, r1, r2)
-        elif args.q1:
-            read_writer(df, r1, r2)
-        else:
-            read_writer_basic(df, r1, r2)
+    if args.r1:
+        read_writer_samples(df, r1, r2)
+    elif args.q1:
+        read_writer(df, r1, r2)
+    else:
+        read_writer_basic(df, r1, r2, gen_name)
 
 
-def simulate_adapters(dup_file):
-    """
-    simulate ligation of adapters to sequences
-
-    adapters must contain RE motif if sticky ends are used
-    the associated barcode is saved alongside the read as r1/2_id
-    """
-    df = pd.read_csv(dup_file)
-    lig_seq_ls = []
-    r1_ls = []
-    r2_ls = []
-    lig_len_ls = []
-
-    for seq in df['seq']:
-        r1_dapt, r1_id = random.choice(list(args.a1.items()))
-        r2_dapt, r2_id = random.choice(list(args.a2.items()))
-        ligated_seq = r1_dapt + seq + r2_dapt
-        lig_seq_ls.append(ligated_seq)
-        r1_ls.append(r1_id)
-        r2_ls.append(r2_id)
-        lig_len_ls.append(len(ligated_seq))
-
-    df['seq'] = lig_seq_ls
-    df['full_length'] = lig_len_ls
-    df['r1_id'] = r1_ls
-    df['r2_id'] = r2_ls
-
-    adapt_file = os.path.join(proj, 'adapt_' + os.path.basename(args.genome) + '.csv')
-
-    df = df[['seq','start','end','strand','length','full_length','r1_id','r2_id']]
-    df.to_csv(adapt_file, index=None)
-
-    return adapt_file
+#def simulate_adapters(dup_file):
+#    """
+#    simulate ligation of adapters to sequences
+#
+#    adapters must contain RE motif if sticky ends are used
+#    the associated barcode is saved alongside the read as r1/2_id
+#    """
+#    df = pd.read_csv(dup_file)
+#    lig_seq_ls = []
+#    r1_ls = []
+#    r2_ls = []
+#    lig_len_ls = []
+#
+#    for seq in df['seq']:
+#        r1_dapt, r1_id = random.choice(list(args.a1.items()))
+#        r2_dapt, r2_id = random.choice(list(args.a2.items()))
+#        ligated_seq = r1_dapt + seq + r2_dapt
+#        lig_seq_ls.append(ligated_seq)
+#        r1_ls.append(r1_id)
+#        r2_ls.append(r2_id)
+#        lig_len_ls.append(len(ligated_seq))
+#
+#    df['seq'] = lig_seq_ls
+#    df['full_length'] = lig_len_ls
+#    df['r1_id'] = r1_ls
+#    df['r2_id'] = r2_ls
+#
+#    adapt_file = os.path.join(args.o, 'adapt_' + os.path.basename(args.genome) + '.csv')
+#
+#    df = df[['seq','start','end','strand','length','full_length','r1_id','r2_id']]
+#    df.to_csv(adapt_file, index=None)
+#
+#    return adapt_file
 
 
 def read_writer(df, r1, r2):
@@ -469,7 +489,7 @@ def read_mutator_samples(seq, scores_dt, sampled_q):
     return mut_seq, score
 
 
-def read_writer_basic(df, r1, r2):
+def read_writer_basic(df, r1, r2, gen_name):
     """
     create a fastq-formatted output with no attempt at error profiling
 
@@ -477,29 +497,25 @@ def read_writer_basic(df, r1, r2):
     args.a2s is where to begin in the R2 adapter
     """
     df = np.array(df)
-    gen_name = os.path.basename(args.genome)
     id = 0
     score = 'I' * args.l
-    args.a1 = list(args.a1.items())
-    args.a2 = list(args.a2.items())
     a1s = args.a1s
     a1e = args.a1s + args.l
     a2s = args.a2s
     a2e = args.a2s + args.l
-    # seq   start   end m1  m2  length  reverse copies  full    counts
-    # 0     1       2   3   4   5       6       7       8       9
+
     for idx, i in enumerate(df):
         seq = i[0]
-        for j in range(i[9]):
+        for j in range(i[2]):
             a1 = random.choice(args.a1)
             a2 = random.choice(args.a2)
             seq = a1[0] + seq + a2[0]
+            full = len(seq)
             r1_seq = seq[a1s:a1e].ljust(args.l, 'G')
             r2_seq = reverse_comp(seq)[a2s:a2e].ljust(args.l, 'G')
-            r1.write(f'@{id}:{idx}:{i[8]}:{i[5]}:{a1[1]}:{a2[1]}:' \
-                     f'{gen_name} 1\n{r1_seq}\n+\n{score}\n')
-            r2.write(f'@{id}:{idx}:{i[8]}:{i[5]}:{a1[1]}:{a2[1]}:' \
-                     f'{gen_name} 2\n{r2_seq}\n+\n{score}\n')
+            header = f'@{id}:{idx}:{full}:{i[1]}:{a1[1]}:{a2[1]}:{gen_name}'
+            r1.write(f'{header} 1\n{r1_seq}\n+\n{score}\n')
+            r2.write(f'{header} 2\n{r2_seq}\n+\n{score}\n')
             id += 1
 
 
@@ -507,18 +523,18 @@ if __name__ == '__main__':
     args = parse_user_input()
 
     if args.o is None:
-        proj = os.path.dirname(os.path.abspath(__file__))
+        args.o = os.path.dirname(os.path.abspath(__file__))
     elif os.path.exists(args.o) is True:
-        proj = os.path.abspath(args.o)
+        args.o = os.path.abspath(args.o)
     else:
         sys.exit('directory not found at ' + os.path.abspath(args.o))
 
     args.m1, args.m2 = check_for_enzymes(args)
-    motif_dt = {}
-    motif_dt1 = iupac_motifs(args.m1)
-    motif_dt.update(motif_dt1)
-    motif_dt2 = iupac_motifs(args.m2)
-    motif_dt.update(motif_dt2)
+    args.motif_dt = {}
+    args.motif_dt1 = iupac_motifs(args.m1)
+    args.motif_dt.update(args.motif_dt1)
+    args.motif_dt2 = iupac_motifs(args.m2)
+    args.motif_dt.update(args.motif_dt2)
 
     args.t = args.t if args.t else 1
     args.sd = int(round(0.08*args.mean, 0)) # using Sage Science CV of 8%
@@ -556,24 +572,28 @@ if __name__ == '__main__':
     if args.r2:
         open_fastq(args.r2)
 
+    '''
+    begin processing pipeline
+    '''
     genomes_df = check_genomes(args.genome)
     genomes_df, total_freqs = process_genomes(args, genomes_df)
 
-    save_combined_hist(total_freqs, 'fragment_distributions', 'sum_prob')
+    save_combined_hist(total_freqs, 'fragment_distributions', 'sum_prob', args)
     print('simulating size selection')
-    fragment_comps, adjustment = size_selection.main(total_freqs, proj, args)
-    total_freqs['test'] = total_freqs['length'].map(fragment_comps)
-    total_freqs['test'] = round(total_freqs['test'] * total_freqs['sum_prob'] \
+    fragment_comps, adjustment = size_selection.main(total_freqs, args)
+    total_freqs['counts'] = total_freqs['length'].map(fragment_comps)
+    total_freqs['counts'] = round(total_freqs['counts'] * total_freqs['sum_prob'] \
                           * adjustment)
-    print(total_freqs['test'].sum())
-    total_freqs.to_csv('test.csv')
-    save_combined_hist(total_freqs, 'read_distributions', 'test')
+    print(total_freqs['counts'].sum())
+    comb_file = os.path.join(args.o, 'combined.csv')
+    total_freqs.to_csv(comb_file)
+    save_combined_hist(total_freqs, 'read_distributions', 'counts', args)
 
     if args.test:
         sys.exit()
 
     print('simulating fastq formatted sequence reads')
-    write_reads(proj, sampled_file)
+    write_genomes(comb_file, fragment_comps, adjustment)
 
     #TODO add option to input existing digest_file and skip digest_genome
     #TODO consider chromosome by chromosome approach

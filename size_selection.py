@@ -7,7 +7,7 @@ import random
 import sys
 
 
-def main(df, proj, args):
+def main(df, args):
     """
     sampling is performed by first assessing the count of fragments for
     each possible read length and then generating a normal distribution
@@ -33,18 +33,6 @@ def main(df, proj, args):
         fragment_comps[i] = draw_dt[i] / len_dt[i]
 
     return fragment_comps, adjustment
-
-    # sampled_df = draw_reads(df, col_names, draw_dt)
-
-    # index_names = sampled_df[sampled_df['counts'] == 0].index
-    # sampled_df.drop(index_names, inplace=True)
-    # samp_no = sampled_df['counts'].sum()
-    # print(f'fragments sampled around mean of {args.mean}bp : {samp_no}')
-    # sampled_df.reset_index(inplace=True, drop=True)
-    # sampled_file = os.path.join(proj, 'sampled_' + os.path.basename(args.genome) + '.csv')
-    # sampled_df.to_csv(sampled_file, index=None)
-
-    # return sampled_file
 
 
 def modify_length(df, args):
@@ -104,6 +92,4 @@ def get_draw_dict(mean, sd, len_dt, scale_by):
 
 
 if __name__ == '__main__': #TODO add args parse
-    dup_file = sys.argv[1]
-    proj = sys.argv[2]
-    main(dup_file, proj, args)
+    pass
