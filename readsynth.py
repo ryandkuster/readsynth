@@ -252,7 +252,6 @@ def reverse_comp(seq):
 
 
 def process_df(df, digest_file, args):
-    df['length'] = df['seq'].str.len()
     df['forward'] = np.where((df['m1'].isin(args.motif_dt1.keys()) & \
                              df['m2'].isin(args.motif_dt2.keys())), 1, 0)
     df['reverse'] = np.where((df['m1'].isin(args.motif_dt2.keys()) & \
@@ -282,8 +281,6 @@ def process_df(df, digest_file, args):
     tmp_df.loc[:,'reverse'] = 1
 
     df = pd.concat([df, tmp_df])
-    df = df.sort_values(by=['length'])
-    df = df.reset_index(drop=True)
     df.drop('revc', axis=1, inplace=True)
     df.drop('forward', axis=1, inplace=True)
 
@@ -299,6 +296,9 @@ def process_df(df, digest_file, args):
         df.loc[(df['m2'] == mot) & (df['reverse'] == 1), 'seq'] = \
                 df['seq'].str[front:]
 
+    df['length'] = df['seq'].str.len()
+    df = df.sort_values(by=['length'])
+    df = df.reset_index(drop=True)
     df.to_csv(digest_file, index=None)
 
     return digest_file
@@ -505,11 +505,11 @@ def read_writer_basic(df, r1, r2, gen_name):
     a2e = args.a2s + args.l
 
     for idx, i in enumerate(df):
-        seq = i[0]
+        raw_seq = i[0]
         for j in range(i[2]):
             a1 = random.choice(args.a1)
             a2 = random.choice(args.a2)
-            seq = a1[0] + seq + a2[0]
+            seq = a1[0] + raw_seq + a2[0]
             full = len(seq)
             r1_seq = seq[a1s:a1e].ljust(args.l, 'G')
             r2_seq = reverse_comp(seq)[a2s:a2e].ljust(args.l, 'G')

@@ -1,6 +1,7 @@
 # ignore these:
 /raw_data/*
 /tests/test_*
+/tests/*
 /.vscode/*
 /.idea/*
 __pycache__/

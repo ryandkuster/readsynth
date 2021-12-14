@@ -22,7 +22,7 @@ def main(df, args):
 
     len_dt = length_dict(df, args.mean, args.sd)
 
-    a = [len_dt[i] for i in range(args.mean, (args.up_bound+(args.up_bound-args.mean))+1)]
+    a = [len_dt[i] for i in range(max(0, args.mean), (args.up_bound+(args.up_bound-args.mean))+1)]
     avg_upper = sum(a)/len(a)
     scale_by = avg_upper/gauss_pdf(args.mean, args.sd, args.up_bound)
     draw_dt = get_draw_dict(args.mean, args.sd, len_dt, scale_by)
