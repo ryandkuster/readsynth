@@ -3,6 +3,7 @@
 /tests/test_*
 /tests/*
 /.vscode/*
+/.ipynb_checkpoints/*
 /.idea/*
 __pycache__/
 .DS_Store
