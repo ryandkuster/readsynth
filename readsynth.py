@@ -43,7 +43,7 @@ def parse_user_input():
             help='number of subprocesses to run while simulating copy number')
 
     parser.add_argument('-n', type=int, required=True,
-            help='genome copy (depth per locus)')
+            help='total read number')
 
     parser.add_argument('-mean', type=int, required=True,
             help='mean (in bp) of read lengths after size selection')
@@ -218,7 +218,7 @@ def process_genomes(args, genomes_df):
 
         print(f'processing genome {os.path.basename(args.genome)}')
         df = digest_genomes.main(args)
-        digest_file  = process_df(df, digest_file, args)
+        digest_file = process_df(df, digest_file, args)
         prob_file, len_freqs = prob_n_copies.main(digest_file, args)
 
         save_individual_hist(prob_file, args)
@@ -283,6 +283,7 @@ def process_df(df, digest_file, args):
     df = pd.concat([df, tmp_df])
     df.drop('revc', axis=1, inplace=True)
     df.drop('forward', axis=1, inplace=True)
+    df = df.reset_index(drop=True)
 
     # add a quick step that removes appropriate over/underhang
     for mot, front in args.motif_dt.items():
@@ -323,9 +324,14 @@ def save_individual_hist(prob_file, args):
 
 
 def save_combined_hist(total_freqs, image_name, weights, args):
-    ax = sns.histplot(data=total_freqs, x='length', hue='name',
+    try:
+        ax = sns.histplot(data=total_freqs, x='length', hue='name',
                       weights=total_freqs[weights], multiple="stack",
                       binwidth=6, element="step")
+    except IndexError:
+        print('singular read lengths, cannot produce histogram')
+        return
+
     old_legend = ax.legend_
     handles = old_legend.legendHandles
     labels = [t.get_text() for t in old_legend.get_texts()]
@@ -335,28 +341,59 @@ def save_combined_hist(total_freqs, image_name, weights, args):
     plt.savefig(os.path.join(args.o, f'_{image_name}.pdf'), bbox_inches='tight')
 
 
+def prob_to_counts(comb_file, fragment_comps, adjustment, genomes_df):
+    comb_df = pd.read_csv(comb_file)
+    count_files_ls  = list(set(comb_df['counts_file'].to_list()))
+    total = 0
+
+    basenames = [os.path.basename(i) for i in genomes_df['genome']]
+    genomes_df['genome'] = basenames
+    genomes_df['reads'] = np.nan
+    genomes_df['sites'] = np.nan
+
+    for count_file in count_files_ls:
+        df = pd.read_csv(count_file)
+        df['counts'] = df['length'].map(fragment_comps)
+        df['counts'] = round(df['counts'] * df['adj_prob'] \
+                              * adjustment)
+        df.dropna(subset=['counts'], inplace=True)
+        df['counts'] = df['counts'].astype(int)
+        df = df[df['counts'] > 0]
+        total += df['counts'].sum()
+        df = df.reset_index(drop=True)
+        df.to_csv(count_file)
+
+        b_name = os.path.basename(count_file)[7:-4]
+        genomes_df.loc[genomes_df.genome == b_name, 'reads'] = df['counts'].sum()
+        genomes_df.loc[genomes_df.genome == b_name, 'sites'] = df.shape[0]
+
+    return genomes_df
+
+
+def write_final_file(args, genomes_df):
+    genomes_df['avg_depth'] = genomes_df['reads'] / genomes_df['sites']
+    genomes_df['depth_abundance'] = genomes_df['avg_depth'] / \
+            genomes_df['avg_depth'].sum()
+    genomes_df['read_abundance'] = genomes_df['reads'] / \
+            genomes_df['reads'].sum()
+    genomes_df.to_csv(os.path.join(args.o,'metagenome_summary.csv'))
+
+
 def write_genomes(comb_file, fragment_comps, adjustment):
     comb_df = pd.read_csv(comb_file)
     count_files_ls  = list(set(comb_df['counts_file'].to_list()))
 
     args.a1 = list(args.a1.items())
     args.a2 = list(args.a2.items())
-    total = 0 #TODO #TODO #TODO #TODO
+
     with open(os.path.join(args.o, 'sim_metagenome_R1.fastq'), 'w') as r1,\
          open(os.path.join(args.o, 'sim_metagenome_R2.fastq'), 'w') as r2:
 
         for count_file in count_files_ls:
             gen_name = os.path.basename(count_file)[7:-4]
             df = pd.read_csv(count_file)
-            df['counts'] = df['length'].map(fragment_comps)
-            df['counts'] = round(df['counts'] * df['adj_prob'] \
-                                  * adjustment)
-            df.dropna(subset=['counts'], inplace=True)
             df = df[['seq', 'length', 'counts']]
-            df['counts'] = df['counts'].astype(int)
-            total += df['counts'].sum()
             write_reads(df, r1, r2, gen_name)
-    print(total)
 
 
 def write_reads(df, r1, r2, gen_name):
@@ -375,41 +412,6 @@ def write_reads(df, r1, r2, gen_name):
         read_writer(df, r1, r2)
     else:
         read_writer_basic(df, r1, r2, gen_name)
-
-
-#def simulate_adapters(dup_file):
-#    """
-#    simulate ligation of adapters to sequences
-#
-#    adapters must contain RE motif if sticky ends are used
-#    the associated barcode is saved alongside the read as r1/2_id
-#    """
-#    df = pd.read_csv(dup_file)
-#    lig_seq_ls = []
-#    r1_ls = []
-#    r2_ls = []
-#    lig_len_ls = []
-#
-#    for seq in df['seq']:
-#        r1_dapt, r1_id = random.choice(list(args.a1.items()))
-#        r2_dapt, r2_id = random.choice(list(args.a2.items()))
-#        ligated_seq = r1_dapt + seq + r2_dapt
-#        lig_seq_ls.append(ligated_seq)
-#        r1_ls.append(r1_id)
-#        r2_ls.append(r2_id)
-#        lig_len_ls.append(len(ligated_seq))
-#
-#    df['seq'] = lig_seq_ls
-#    df['full_length'] = lig_len_ls
-#    df['r1_id'] = r1_ls
-#    df['r2_id'] = r2_ls
-#
-#    adapt_file = os.path.join(args.o, 'adapt_' + os.path.basename(args.genome) + '.csv')
-#
-#    df = df[['seq','start','end','strand','length','full_length','r1_id','r2_id']]
-#    df.to_csv(adapt_file, index=None)
-#
-#    return adapt_file
 
 
 def read_writer(df, r1, r2):
@@ -573,12 +575,18 @@ if __name__ == '__main__':
         open_fastq(args.r2)
 
     '''
-    begin processing pipeline
+    1.
+    digest genomes one by one, producing raw digest files
     '''
     genomes_df = check_genomes(args.genome)
     genomes_df, total_freqs = process_genomes(args, genomes_df)
-
     save_combined_hist(total_freqs, 'fragment_distributions', 'sum_prob', args)
+
+    '''
+    2.
+    combine relative probabilities of fragments from all input genome digests
+    and perform simulation of size selection
+    '''
     print('simulating size selection')
     fragment_comps, adjustment = size_selection.main(total_freqs, args)
     total_freqs['counts'] = total_freqs['length'].map(fragment_comps)
@@ -589,9 +597,16 @@ if __name__ == '__main__':
     total_freqs.to_csv(comb_file)
     save_combined_hist(total_freqs, 'read_distributions', 'counts', args)
 
+    genomes_df = prob_to_counts(comb_file, fragment_comps, adjustment, genomes_df)
+    write_final_file(args, genomes_df)
+
     if args.test:
         sys.exit()
 
+    '''
+    3.
+    write fragments to fastq-formatted file with adapters concatenated
+    '''
     print('simulating fastq formatted sequence reads')
     write_genomes(comb_file, fragment_comps, adjustment)
 

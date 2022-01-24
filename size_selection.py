@@ -13,6 +13,17 @@ def main(df, args):
     each possible read length and then generating a normal distribution
     that includes enough counts in the mean+2sd range to include a 1X
     coverage of the genome
+
+    fragment_comps:
+    the composition, or relative rate of occurence, per fragment length,
+    across the entirety of input genome digests
+
+    adjustment:
+    based on the sum of all possible fragment occurences, adjusts the
+    value of -n (total read count) to accound for fragment totals that
+    are > or < than n (e.g. for 1,000,000 total reads, 100,000 size-selected
+    fragments will adjust the weight of each read to 10, while 10,000,000
+    fragments will need to be adjusted to 0.1)
     """
 
     if len(df) == 0:
