@@ -138,15 +138,15 @@ def iupac_motifs(arg_m):
 
 def get_adapters(arg):
     """
-    open adapters file and store adapters and barcodes in dt
+    open adapters file and store adapters and barcodes in list of tuples
     """
-    adapters_dt = {}
+    adapters_ls = []
     with open(arg) as f:
         for line in f:
-            adapter, id = line.rstrip().split()
-            adapters_dt[adapter] = id
+            a_top, a_bot, a_id = line.rstrip().split()
+            adapters_ls.append((a_top, a_bot, a_id))
 
-    return adapters_dt
+    return adapters_ls
 
 
 def get_sbs_start(adapter_ls):
@@ -273,7 +273,10 @@ def process_df(df, digest_file, args):
     df.loc[(df['forward'] == 1) & (df['reverse'] == 1), 'reverse'] = 0
 
     # convert remaining reverse strand sequences to the reverse complement
-    df.loc[df['reverse'] == 1, 'seq'] = df['revc']
+    df.loc[df['reverse'] == 1, 'tmp_seq'] = df['revc']
+    df.loc[df['reverse'] == 1, 'revc'] = df['seq']
+    df.loc[df['reverse'] == 1, 'seq'] = df['tmp_seq']
+    df.drop('tmp_seq', axis=1, inplace=True)
 
     # make all tmp_df reads reverse complements and recategorize as reverse
     tmp_df['seq'] = tmp_df['revc'].values
@@ -281,7 +284,6 @@ def process_df(df, digest_file, args):
     tmp_df.loc[:,'reverse'] = 1
 
     df = pd.concat([df, tmp_df])
-    df.drop('revc', axis=1, inplace=True)
     df.drop('forward', axis=1, inplace=True)
     df = df.reset_index(drop=True)
 
@@ -290,12 +292,23 @@ def process_df(df, digest_file, args):
         back = len(mot) - front
         df.loc[(df['m1'] == mot) & (df['reverse'] == 0), 'seq'] = \
                 df['seq'].str[front:]
+        df.loc[(df['m1'] == mot) & (df['reverse'] == 0), 'revc'] = \
+                df['revc'].str[:-back]
+
         df.loc[(df['m1'] == mot) & (df['reverse'] == 1), 'seq'] = \
                 df['seq'].str[:-back]
+        df.loc[(df['m1'] == mot) & (df['reverse'] == 1), 'revc'] = \
+                df['revc'].str[front:]
+
         df.loc[(df['m2'] == mot) & (df['reverse'] == 0), 'seq'] = \
                 df['seq'].str[:-back]
+        df.loc[(df['m2'] == mot) & (df['reverse'] == 0), 'revc'] = \
+                df['revc'].str[front:]
+
         df.loc[(df['m2'] == mot) & (df['reverse'] == 1), 'seq'] = \
                 df['seq'].str[front:]
+        df.loc[(df['m2'] == mot) & (df['reverse'] == 1), 'revc'] = \
+                df['revc'].str[:-back]
 
     df['length'] = df['seq'].str.len()
     df = df.sort_values(by=['length'])
@@ -383,16 +396,13 @@ def write_genomes(comb_file, fragment_comps, adjustment):
     comb_df = pd.read_csv(comb_file)
     count_files_ls  = list(set(comb_df['counts_file'].to_list()))
 
-    args.a1 = list(args.a1.items())
-    args.a2 = list(args.a2.items())
-
     with open(os.path.join(args.o, 'sim_metagenome_R1.fastq'), 'w') as r1,\
          open(os.path.join(args.o, 'sim_metagenome_R2.fastq'), 'w') as r2:
 
         for count_file in count_files_ls:
             gen_name = os.path.basename(count_file)[7:-4]
             df = pd.read_csv(count_file)
-            df = df[['seq', 'length', 'counts']]
+            df = df[['seq', 'revc', 'length', 'counts']]
             write_reads(df, r1, r2, gen_name)
 
 
@@ -499,7 +509,7 @@ def read_writer_basic(df, r1, r2, gen_name):
     args.a2s is where to begin in the R2 adapter
     """
     df = np.array(df)
-    id = 0
+    r_no = 0
     score = 'I' * args.l
     a1s = args.a1s
     a1e = args.a1s + args.l
@@ -507,18 +517,19 @@ def read_writer_basic(df, r1, r2, gen_name):
     a2e = args.a2s + args.l
 
     for idx, i in enumerate(df):
-        raw_seq = i[0]
-        for j in range(i[2]):
+        for j in range(i[3]):
             a1 = random.choice(args.a1)
             a2 = random.choice(args.a2)
-            seq = a1[0] + raw_seq + a2[0]
-            full = len(seq)
-            r1_seq = seq[a1s:a1e].ljust(args.l, 'G')
-            r2_seq = reverse_comp(seq)[a2s:a2e].ljust(args.l, 'G')
-            header = f'@{id}:{idx}:{full}:{i[1]}:{a1[1]}:{a2[1]}:{gen_name}'
+            r1_seq = a1[0] + i[0] + a2[1]
+            r2_seq = a2[0] + i[1] + a1[1]
+            r1_seq = r1_seq[a1s:a1e].ljust(args.l, 'G')
+            r2_seq = r2_seq[a2s:a2e].ljust(args.l, 'G')
+            #r2_seq = reverse_comp(seq)[a2s:a2e].ljust(args.l, 'G')
+            full = len(r1_seq)
+            header = f'@{r_no}:{idx}:{full}:{i[1]}:{a1[2]}:{a2[2]}:{gen_name}'
             r1.write(f'{header} 1\n{r1_seq}\n+\n{score}\n')
             r2.write(f'{header} 2\n{r2_seq}\n+\n{score}\n')
-            id += 1
+            r_no += 1
 
 
 if __name__ == '__main__':
@@ -552,13 +563,12 @@ if __name__ == '__main__':
     if args.a1:
         args.a1 = get_adapters(args.a1)
         if not args.a1s:
-            args.a1s = get_sbs_start(list(args.a1.keys()))
+            args.a1s = get_sbs_start([i[0] for i in args.a1])
 
     if args.a2:
         args.a2 = get_adapters(args.a2)
-        args.a2 = {reverse_comp(adapter): id for adapter, id in args.a2.items()}
         if not args.a2s:
-            args.a2s = get_sbs_start(list(args.a2.keys()))
+            args.a2s = get_sbs_start([i[0] for i in args.a2])
 
     if args.q1:
         args.prob_mx1, args.q_dt1, args.q_ls1 = get_qscores(args.q1)
@@ -610,7 +620,6 @@ if __name__ == '__main__':
     print('simulating fastq formatted sequence reads')
     write_genomes(comb_file, fragment_comps, adjustment)
 
-    #TODO add option to input existing digest_file and skip digest_genome
     #TODO consider chromosome by chromosome approach
         # this would only temporarily store sequences in the raw digest
         # raw digests (per chromosome) will be digested and stored as copies

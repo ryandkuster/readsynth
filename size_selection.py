@@ -55,12 +55,13 @@ def modify_length(df, args):
     sort and return df with full_length column
     '''
     if args.a1 and args.a2:
-        a1_avg = sum([len(i) for i in args.a1.keys()]) / len(args.a1.keys())
-        a2_avg = sum([len(i) for i in args.a2.keys()]) / len(args.a2.keys())
+        a1_avg = sum([len(i[0]) for i in args.a1]) / len(args.a1)
+        a2_avg = sum([len(i[1]) for i in args.a2]) / len(args.a2)
         modifier = round(a1_avg + a2_avg)
     elif args.a1:
-        a1_avg = sum([len(i) for i in args.a1.keys()]) / len(args.a1.keys())
-        modifier = round(2 * a1_avg)
+        a1_avg = sum([len(i[0]) for i in args.a1]) / len(args.a1)
+        a2_avg = sum([len(i[1]) for i in args.a1]) / len(args.a1)
+        modifier = round(a1_avg + a2_avg)
     else:
         modifier = 0
 
