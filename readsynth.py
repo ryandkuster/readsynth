@@ -33,7 +33,7 @@ def parse_user_input():
     parser.add_argument('-m2', type=str, required=True, nargs='+',
             help='space separated list of RE motifs (e.g., AluI = AG/CT, HindIII = A/AGCTT, SmlI = C/TYRAG)')
 
-    parser.add_argument('-l', type=int, required=False,
+    parser.add_argument('-l', type=int, required=True,
             help='desired read length of final simulated reads (defaults to 250 or given q1/q2 profiles)')
 
     parser.add_argument('-test', dest='test', action='store_true',
@@ -71,12 +71,6 @@ def parse_user_input():
 
     parser.add_argument('-a2s', type=int, required=False,
             help='manually provide bp length of adapter a1 before SBS begins')
-
-    parser.add_argument('-q1', type=str, required=False,
-            help='file containing R1 q scores in csv format (see ngsComposer tool crinoid)')
-
-    parser.add_argument('-q2', type=str, required=False,
-            help='file containing R2 q scores in csv format (see ngsComposer tool crinoid)')
 
     parser.add_argument('-r1', type=str, required=False,
             help='R1 fastq file to sample Q scores')
@@ -164,34 +158,18 @@ def get_sbs_start(adapter_ls):
                 return idx-1
 
 
-def get_qscores(arg):
-    print('getting q score profile')
-    scores = list('!"#$%&\'()*+,-./0123456789:;<=>?@ABCDEFGHIJK')
-    nums = [i for i in range(43)]
-    df = pd.read_csv(arg, names=scores)
-    df = df.loc[:, df.any()]
-    scores_ls = df.columns.tolist()
-    scores_dt = {v: 10**(-k/10) for k,v in zip(nums, scores) if v in scores_ls}
-
-    prob_mx = []
-    for idx, row in df.iterrows():
-        q_ls = [i/sum(row) for i in row]
-        prob_mx.append(q_ls)
-
-    return prob_mx, scores_dt, scores_ls
-
-
 def open_fastq(fastq):
     print(f'sampling {args.p} percent of scores from {fastq}')
     perc_keep = [int(args.p)/100, 1-(int(args.p)/100)]
     i = 0
+
     with open(fastq) as f, open(fastq + '_sampled_scores.csv', 'w') as out:
         for line in f:
             i += 1
             if i == 4:
                 keep = np.random.choice([True, False], 1, p=perc_keep)
                 if keep:
-                    out.write(line)
+                    out.write(line[:args.l] + '\n')
                 i = 0
 
 
@@ -417,72 +395,47 @@ def write_reads(df, r1, r2, gen_name):
         args.a1s, args.a2s = 0, 0
 
     if args.r1:
-        read_writer_samples(df, r1, r2)
-    elif args.q1:
-        read_writer(df, r1, r2)
+        read_writer_samples(df, r1, r2, gen_name)
     else:
         read_writer_basic(df, r1, r2, gen_name)
 
 
-def read_writer(df, r1, r2):
+def read_writer_samples(df, r1, r2, gen_name):
     """
     args.a1s is where to begin in the R1 adapter
     args.a2s is where to begin in the R2 adapter
     """
-    gen_name = os.path.basename(args.genome)
-    id = 0
-    for idx, row in df.iterrows():
-        r1_seq = row['seq'][args.a1s:args.a1s+args.l].ljust(args.l, 'G')
-        r2_seq = reverse_comp(row['seq'])[args.a2s:args.a2s+args.l].ljust(args.l, 'G')
-        for count in range(row['counts']):
-            r1_mut, r1_score = read_mutator(r1_seq, args.prob_mx1, args.q_dt1, args.q_ls1)
-            r2_mut, r2_score = read_mutator(r2_seq, args.prob_mx2, args.q_dt2, args.q_ls2)
-            r1.write(f'@{id}:{idx}:{row[5]}:{row[4]}:{row[6]}:{row[7]}:' \
-                     f'{gen_name} 1\n{r1_mut}\n+\n{r1_score}\n')
-            r2.write(f'@{id}:{idx}:{row[5]}:{row[4]}:{row[6]}:{row[7]}:' \
-                     f'{gen_name} 2\n{r2_mut}\n+\n{r2_score}\n')
-            id += 1
 
+    scores = list('!"#$%&\'()*+,-./0123456789:;<=>?@ABCDEFGHIJK')
+    scores_dt = {j: 10**(-i/10) for i, j in enumerate(scores)}
 
-def read_mutator(seq, prob_mx, scores_dt, q_ls):
-    """
-    using pure, per-base probability profile, mutate bases
-    """
-    mut_seq = ''
-    score = ''.join([np.random.choice(q_ls, 1, p=i)[0] for i in prob_mx])
-    for base, q in zip(seq, score):
-        p = scores_dt[q]
-        base_ls = ['A', 'C', 'G', 'T', 'N']
-        base_ls.remove(base)
-        base_ls.append(base)
-        p_ls = [p/4, p/4, p/4, p/4, 1-p]
-        mut_seq += np.random.choice(base_ls, 1, p=p_ls)[0]
-    return mut_seq, score
-
-
-def read_writer_samples(df, r1, r2):
-    """
-    args.a1s is where to begin in the R1 adapter
-    args.a2s is where to begin in the R2 adapter
-    """
     sampled_q1 = pd.read_csv(args.r1 + '_sampled_scores.csv', names=['score'], sep = '\t')
     sampled_q2 = pd.read_csv(args.r2 + '_sampled_scores.csv', names=['score'], sep = '\t')
     sampled_q1 = list(sampled_q1['score'].values)
     sampled_q2 = list(sampled_q2['score'].values)
-    args.l = len(max(sampled_q1, key=len))
-    gen_name = os.path.basename(args.genome)
-    id = 0
-    for idx, row in df.iterrows():
-        r1_seq = row['seq'][args.a1s:args.a1s+args.l].ljust(args.l, 'G')
-        r2_seq = reverse_comp(row['seq'])[args.a2s:args.a2s+args.l].ljust(args.l, 'G')
-        for count in range(row['counts']):
-            r1_mut, r1_score = read_mutator_samples(r1_seq, args.q_dt1, sampled_q1)
-            r2_mut, r2_score = read_mutator_samples(r2_seq, args.q_dt2, sampled_q2)
-            r1.write(f'@{id}:{idx}:{row[5]}:{row[4]}:{row[6]}:{row[7]}:' \
-                     f'{gen_name} 1\n{r1_mut}\n+\n{r1_score}\n')
-            r2.write(f'@{id}:{idx}:{row[5]}:{row[4]}:{row[6]}:{row[7]}:' \
-                     f'{gen_name} 2\n{r2_mut}\n+\n{r2_score}\n')
-            id += 1
+
+    df = np.array(df)
+    r_no = 0
+    a1s = args.a1s
+    a1e = args.a1s + args.l
+    a2s = args.a2s
+    a2e = args.a2s + args.l
+
+    for idx, i in enumerate(df):
+        for j in range(i[3]):
+            a1 = random.choice(args.a1)
+            a2 = random.choice(args.a2)
+            r1_seq = a1[0] + i[0] + a2[1]
+            r2_seq = a2[0] + i[1] + a1[1]
+            r1_seq = r1_seq[a1s:a1e].ljust(args.l, 'G')
+            r2_seq = r2_seq[a2s:a2e].ljust(args.l, 'G')
+            r1_mut, r1_score = read_mutator_samples(r1_seq, scores_dt, sampled_q1)
+            r2_mut, r2_score = read_mutator_samples(r2_seq, scores_dt, sampled_q2)
+            full = len(r1_seq)
+            header = f'@{r_no}:{idx}:{full}:{i[2]}:{a1[2]}:{a2[2]}:{gen_name}'
+            r1.write(f'{header} 1\n{r1_mut}\n+\n{r1_score}\n')
+            r2.write(f'{header} 2\n{r2_mut}\n+\n{r2_score}\n')
+            r_no += 1
 
 
 def read_mutator_samples(seq, scores_dt, sampled_q):
@@ -491,6 +444,7 @@ def read_mutator_samples(seq, scores_dt, sampled_q):
     """
     mut_seq = ''
     score = random.choice(sampled_q)
+
     for base, q in zip(seq, score):
         p = scores_dt[q]
         base_ls = ['A', 'C', 'G', 'T', 'N']
@@ -498,6 +452,7 @@ def read_mutator_samples(seq, scores_dt, sampled_q):
         base_ls.append(base)
         p_ls = [p/4, p/4, p/4, p/4, 1-p]
         mut_seq += np.random.choice(base_ls, 1, p=p_ls)[0]
+
     return mut_seq, score
 
 
@@ -526,7 +481,7 @@ def read_writer_basic(df, r1, r2, gen_name):
             r2_seq = r2_seq[a2s:a2e].ljust(args.l, 'G')
             #r2_seq = reverse_comp(seq)[a2s:a2e].ljust(args.l, 'G')
             full = len(r1_seq)
-            header = f'@{r_no}:{idx}:{full}:{i[1]}:{a1[2]}:{a2[2]}:{gen_name}'
+            header = f'@{r_no}:{idx}:{full}:{i[2]}:{a1[2]}:{a2[2]}:{gen_name}'
             r1.write(f'{header} 1\n{r1_seq}\n+\n{score}\n')
             r2.write(f'{header} 2\n{r2_seq}\n+\n{score}\n')
             r_no += 1
@@ -555,11 +510,6 @@ if __name__ == '__main__':
     args.min = args.min if args.min else 6
     args.max = args.max if args.max else (args.mean + (6*args.sd))
 
-    if args.r1 and not args.q1:
-        sys.exit('please provide q scores profile for R1')
-
-    args.l = args.l if args.l else 250
-
     if args.a1:
         args.a1 = get_adapters(args.a1)
         if not args.a1s:
@@ -570,15 +520,12 @@ if __name__ == '__main__':
         if not args.a2s:
             args.a2s = get_sbs_start([i[0] for i in args.a2])
 
-    if args.q1:
-        args.prob_mx1, args.q_dt1, args.q_ls1 = get_qscores(args.q1)
-        args.l = len(args.prob_mx1)
-
-    if args.q2:
-        args.prob_mx2, args.q_dt2, args.q_ls2 = get_qscores(args.q2)
-        args.l = len(args.prob_mx2)
-
+    #TODO add test to see if fastq read length meets user defined args.l
+    #TODO consider writing this in sed
+    #TODO consider trimming scores to meet args.l
     if args.r1:
+        if not args.p:
+            sys.exit('please provide input \"-p\" for percent of fq to sample')
         open_fastq(args.r1)
 
     if args.r2:
