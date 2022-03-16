@@ -246,6 +246,9 @@ def process_df(df, digest_file, args):
             inplace = True)
     df = df.reset_index(drop=True)
 
+    # convert all redundant IUPAC codes to 'N'
+    df['seq'] = df['seq'].str.replace('[RYSWKMBDHV]','N')
+
     # create a column of reverse complement sequences
     df['revc'] = [reverse_comp(i) for i in df['seq'].to_list()]
 
