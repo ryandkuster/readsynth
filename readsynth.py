@@ -10,12 +10,20 @@ import pickle
 import random
 import re
 import seaborn as sns
+import subprocess
 import sys
 import time
 
-import prob_n_copies
-import digest_genomes
-import size_selection
+import scripts.prob_n_copies as prob_n_copies
+import scripts.digest_genomes as digest_genomes
+import scripts.size_selection as size_selection
+import scripts.write_reads as write_reads
+
+
+#class taxa():
+#
+#    def __init__(self):
+#        pass
 
 
 def parse_user_input():
@@ -28,19 +36,16 @@ def parse_user_input():
             help='path to store output')
 
     parser.add_argument('-m1', type=str, required=True, nargs='+',
-            help='space separated list of RE motifs (e.g., AluI = AG/CT, HindIII = A/AGCTT, SmlI = C/TYRAG)')
+            help='space separated list of RE motifs (e.g., AluI or AG/CT, HindIII or A/AGCTT, SmlI or C/TYRAG)')
 
     parser.add_argument('-m2', type=str, required=True, nargs='+',
-            help='space separated list of RE motifs (e.g., AluI = AG/CT, HindIII = A/AGCTT, SmlI = C/TYRAG)')
+            help='space separated list of RE motifs (e.g., AluI or AG/CT, HindIII or A/AGCTT, SmlI or C/TYRAG)')
 
     parser.add_argument('-l', type=int, required=True,
             help='desired read length of final simulated reads (defaults to 250 or given q1/q2 profiles)')
 
     parser.add_argument('-test', dest='test', action='store_true',
             help='test mode: create newline-separated file of RE digested sequences only')
-
-    parser.add_argument('-t', type=int, required=False,
-            help='number of subprocesses to run while simulating copy number')
 
     parser.add_argument('-n', type=int, required=True,
             help='total read number')
@@ -158,7 +163,7 @@ def get_sbs_start(adapter_ls):
                 return idx-1
 
 
-def open_fastq(fastq):
+def open_fastq(fastq, args):
     print(f'sampling {args.p} percent of scores from {fastq}')
     perc_keep = [int(args.p)/100, 1-(int(args.p)/100)]
     i = 0
@@ -208,6 +213,7 @@ def process_genomes(args, genomes_df):
         tmp_df['counts_file'] = prob_file
         total_freqs = pd.concat([total_freqs, tmp_df], axis=0)
 
+    total_freqs = total_freqs.reset_index(drop=True)
     genomes_df['digest_file'] = digest_ls
     genomes_df['prob_file'] = prob_ls
 
@@ -239,6 +245,9 @@ def process_df(df, digest_file, args):
     df.drop(df[(df['forward'] == 0) & (df['reverse'] == 0)].index,
             inplace = True)
     df = df.reset_index(drop=True)
+
+    # convert all redundant IUPAC codes to 'N'
+    df['seq'] = df['seq'].str.replace('[RYSWKMBDHV]','N')
 
     # create a column of reverse complement sequences
     df['revc'] = [reverse_comp(i) for i in df['seq'].to_list()]
@@ -374,117 +383,31 @@ def write_genomes(comb_file, fragment_comps, adjustment):
     comb_df = pd.read_csv(comb_file)
     count_files_ls  = list(set(comb_df['counts_file'].to_list()))
 
-    with open(os.path.join(args.o, 'sim_metagenome_R1.fastq'), 'w') as r1,\
-         open(os.path.join(args.o, 'sim_metagenome_R2.fastq'), 'w') as r2:
+    sim1 = os.path.join(args.o, 'sim_metagenome_R1.fastq')
+    sim2 = os.path.join(args.o, 'sim_metagenome_R2.fastq')
+    error1 = os.path.join(args.o, 'error_sim_metagenome_R1.fastq')
+    error2 = os.path.join(args.o, 'error_sim_metagenome_R2.fastq')
 
+    with open(sim1, 'w') as r1, open(sim2, 'w') as r2:
         for count_file in count_files_ls:
             gen_name = os.path.basename(count_file)[7:-4]
             df = pd.read_csv(count_file)
             df = df[['seq', 'revc', 'length', 'counts']]
-            write_reads(df, r1, r2, gen_name)
+            write_reads.main(df, r1, r2, gen_name, args)
+
+    if args.r1 and args.r2:
+        print('applying error profile')
+        command = os.path.join(os.path.dirname(__file__), "src", "apply_error")
+        simulate_error(command, sim1, error1)
+        simulate_error(command, sim2, error2)
 
 
-def write_reads(df, r1, r2, gen_name):
-    """
-    using the sampled read distribution, write to file as fastq format
-    if adapters, randomly add sample and concatenate adapters
-    if sample fastq data provided, mutate samples for error simulation
-    """
-
-    if not args.a1s:
-        args.a1s, args.a2s = 0, 0
-
-    if args.r1:
-        read_writer_samples(df, r1, r2, gen_name)
-    else:
-        read_writer_basic(df, r1, r2, gen_name)
-
-
-def read_writer_samples(df, r1, r2, gen_name):
-    """
-    args.a1s is where to begin in the R1 adapter
-    args.a2s is where to begin in the R2 adapter
-    """
-
-    scores = list('!"#$%&\'()*+,-./0123456789:;<=>?@ABCDEFGHIJK')
-    scores_dt = {j: 10**(-i/10) for i, j in enumerate(scores)}
-
-    sampled_q1 = pd.read_csv(args.r1 + '_sampled_scores.csv', names=['score'], sep = '\t')
-    sampled_q2 = pd.read_csv(args.r2 + '_sampled_scores.csv', names=['score'], sep = '\t')
-    sampled_q1 = list(sampled_q1['score'].values)
-    sampled_q2 = list(sampled_q2['score'].values)
-
-    df = np.array(df)
-    r_no = 0
-    a1s = args.a1s
-    a1e = args.a1s + args.l
-    a2s = args.a2s
-    a2e = args.a2s + args.l
-
-    for idx, i in enumerate(df):
-        for j in range(i[3]):
-            a1 = random.choice(args.a1)
-            a2 = random.choice(args.a2)
-            r1_seq = a1[0] + i[0] + a2[1]
-            r2_seq = a2[0] + i[1] + a1[1]
-            r1_seq = r1_seq[a1s:a1e].ljust(args.l, 'G')
-            r2_seq = r2_seq[a2s:a2e].ljust(args.l, 'G')
-            r1_mut, r1_score = read_mutator_samples(r1_seq, scores_dt, sampled_q1)
-            r2_mut, r2_score = read_mutator_samples(r2_seq, scores_dt, sampled_q2)
-            full = len(r1_seq)
-            header = f'@{r_no}:{idx}:{full}:{i[2]}:{a1[2]}:{a2[2]}:{gen_name}'
-            r1.write(f'{header} 1\n{r1_mut}\n+\n{r1_score}\n')
-            r2.write(f'{header} 2\n{r2_mut}\n+\n{r2_score}\n')
-            r_no += 1
-
-
-def read_mutator_samples(seq, scores_dt, sampled_q):
-    """
-    using actual sampled per-read q scores, mutate bases
-    """
-    mut_seq = ''
-    score = random.choice(sampled_q)
-
-    for base, q in zip(seq, score):
-        p = scores_dt[q]
-        base_ls = ['A', 'C', 'G', 'T', 'N']
-        base_ls.remove(base)
-        base_ls.append(base)
-        p_ls = [p/4, p/4, p/4, p/4, 1-p]
-        mut_seq += np.random.choice(base_ls, 1, p=p_ls)[0]
-
-    return mut_seq, score
-
-
-def read_writer_basic(df, r1, r2, gen_name):
-    """
-    create a fastq-formatted output with no attempt at error profiling
-
-    args.a1s is where to begin in the R1 adapter
-    args.a2s is where to begin in the R2 adapter
-    """
-    df = np.array(df)
-    r_no = 0
-    score = 'I' * args.l
-    a1s = args.a1s
-    a1e = args.a1s + args.l
-    a2s = args.a2s
-    a2e = args.a2s + args.l
-
-    for idx, i in enumerate(df):
-        for j in range(i[3]):
-            a1 = random.choice(args.a1)
-            a2 = random.choice(args.a2)
-            r1_seq = a1[0] + i[0] + a2[1]
-            r2_seq = a2[0] + i[1] + a1[1]
-            r1_seq = r1_seq[a1s:a1e].ljust(args.l, 'G')
-            r2_seq = r2_seq[a2s:a2e].ljust(args.l, 'G')
-            #r2_seq = reverse_comp(seq)[a2s:a2e].ljust(args.l, 'G')
-            full = len(r1_seq)
-            header = f'@{r_no}:{idx}:{full}:{i[2]}:{a1[2]}:{a2[2]}:{gen_name}'
-            r1.write(f'{header} 1\n{r1_seq}\n+\n{score}\n')
-            r2.write(f'{header} 2\n{r2_seq}\n+\n{score}\n')
-            r_no += 1
+def simulate_error(command, sim_in, error_out):
+    process = subprocess.Popen([command, sim_in, error_out], shell=False)
+    out, err = process.communicate()
+    errcode = process.returncode
+    process.kill()
+    process.terminate()
 
 
 if __name__ == '__main__':
@@ -504,7 +427,6 @@ if __name__ == '__main__':
     args.motif_dt2 = iupac_motifs(args.m2)
     args.motif_dt.update(args.motif_dt2)
 
-    args.t = args.t if args.t else 1
     args.sd = int(round(0.08*args.mean, 0)) # using Sage Science CV of 8%
     args.sd = max(args.sd, int(round((args.up_bound - args.mean)/2, 0)))
     args.min = args.min if args.min else 6
@@ -520,16 +442,11 @@ if __name__ == '__main__':
         if not args.a2s:
             args.a2s = get_sbs_start([i[0] for i in args.a2])
 
-    #TODO add test to see if fastq read length meets user defined args.l
-    #TODO consider writing this in sed
-    #TODO consider trimming scores to meet args.l
-    if args.r1:
+    if args.r1 or args.r2:
         if not args.p:
             sys.exit('please provide input \"-p\" for percent of fq to sample')
-        open_fastq(args.r1)
-
-    if args.r2:
-        open_fastq(args.r2)
+        open_fastq(args.r1, args)
+        open_fastq(args.r2, args)
 
     '''
     1.
@@ -542,7 +459,7 @@ if __name__ == '__main__':
     '''
     2.
     combine relative probabilities of fragments from all input genome digests
-    and perform simulation of size selection
+    and perform simulation of pooled size selection
     '''
     print('simulating size selection')
     fragment_comps, adjustment = size_selection.main(total_freqs, args)
