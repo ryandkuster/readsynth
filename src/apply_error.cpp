@@ -29,7 +29,6 @@ bool miscall_test(double prob){
 
 
 std::string mutate_seq (std::string seq, std::string score, double scores_arr[], std::string phred_scores) {
-    srand(time(0));
     std::string mut_seq = "";
     for (int i = 0; i < seq.length(); i++) {
         char base = seq[i];
@@ -59,9 +58,10 @@ std::string mutate_seq (std::string seq, std::string score, double scores_arr[],
 int main (int argc, char **argv)
 {
     std::string file_name = argv[1];
+    std::string out_name = argv[2];
 
     std::ifstream file(file_name);
-    std::ofstream out("test_out.txt");
+    std::ofstream out(out_name);
 
     std::string phred_scores = "!\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJ";
     int N = phred_scores.length();
@@ -78,6 +78,8 @@ int main (int argc, char **argv)
     std::string seq = "";
     std::string plus = "+";
     std::string score = "";
+
+    srand(time(0));
 
     while (std::getline(file, line)) {
         ++line_no;

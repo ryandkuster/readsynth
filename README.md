@@ -71,8 +71,6 @@ The above example takes 'reference.fasta' as a **genome** to be digested with Ec
                     to 250 or given q1/q2 profiles)
 - test - test mode: create newline-separated file of RE digested
                     sequences only
-- t - number of subprocesses to run while simulating copy
-                    number
 - n - genome copy (depth per locus)
 - mean - mean (in bp) of read lengths after size selection
 - sd - standard deviation (in bp) of read lengths after size

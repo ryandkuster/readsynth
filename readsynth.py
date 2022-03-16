@@ -382,6 +382,8 @@ def write_genomes(comb_file, fragment_comps, adjustment):
 
     sim1 = os.path.join(args.o, 'sim_metagenome_R1.fastq')
     sim2 = os.path.join(args.o, 'sim_metagenome_R2.fastq')
+    error1 = os.path.join(args.o, 'error_sim_metagenome_R1.fastq')
+    error2 = os.path.join(args.o, 'error_sim_metagenome_R2.fastq')
 
     with open(sim1, 'w') as r1, open(sim2, 'w') as r2:
         for count_file in count_files_ls:
@@ -393,12 +395,16 @@ def write_genomes(comb_file, fragment_comps, adjustment):
     if args.r1 and args.r2:
         print('applying error profile')
         command = os.path.join(os.path.dirname(__file__), "src", "apply_error")
-        process = subprocess.Popen([command, sim1], shell=False)
-        process = subprocess.Popen([command, sim2], shell=False)
-        out, err = process.communicate()
-        errcode = process.returncode
-        process.kill()
-        process.terminate()
+        simulate_error(command, sim1, error1)
+        simulate_error(command, sim2, error2)
+
+
+def simulate_error(command, sim_in, error_out):
+    process = subprocess.Popen([command, sim_in, error_out], shell=False)
+    out, err = process.communicate()
+    errcode = process.returncode
+    process.kill()
+    process.terminate()
 
 
 if __name__ == '__main__':

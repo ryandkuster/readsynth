@@ -42,19 +42,32 @@ def read_writer_samples(df, r1, r2, gen_name, args):
 
     for idx, i in enumerate(df):
         for j in range(i[3]):
-            a1 = random.choice(args.a1)
-            a2 = random.choice(args.a2)
-            r1_seq = a1[0] + i[0] + a2[1]
-            r2_seq = a2[0] + i[1] + a1[1]
-            r1_seq = r1_seq[a1s:a1e].ljust(args.l, 'G')
-            r2_seq = r2_seq[a2s:a2e].ljust(args.l, 'G')
-            r1_score = random.choice(sampled_q1)
-            r2_score = random.choice(sampled_q2)
-            full = len(r1_seq)
+            a1, a2, r1_seq, r2_seq, full = create_seq(i, a1s, a1e, a2s, a2e, args)
+            r1_seq, r1_score = even_score_seq(r1_seq, sampled_q1)
+            r2_seq, r2_score = even_score_seq(r2_seq, sampled_q2)
             header = f'@{r_no}:{idx}:{full}:{i[2]}:{a1[2]}:{a2[2]}:{gen_name}'
             r1.write(f'{header} 1\n{r1_seq}\n+\n{r1_score}\n')
             r2.write(f'{header} 2\n{r2_seq}\n+\n{r2_score}\n')
             r_no += 1
+
+
+def create_seq(i, a1s, a1e, a2s, a2e, args):
+    a1 = random.choice(args.a1)
+    a2 = random.choice(args.a2)
+    r1_seq = a1[0] + i[0] + a2[1]
+    r2_seq = a2[0] + i[1] + a1[1]
+    full = len(r1_seq)
+    r1_seq = r1_seq[a1s:a1e].ljust(args.l, 'G')
+    r2_seq = r2_seq[a2s:a2e].ljust(args.l, 'G')
+
+    return a1, a2, r1_seq, r2_seq, full
+
+
+def even_score_seq(seq, sampled_q):
+    score = random.choice(sampled_q)
+    adj_l = len(min(seq, score, key=len))
+
+    return seq[:adj_l], score[:adj_l]
 
 
 def read_writer_basic(df, r1, r2, gen_name, args):
@@ -74,13 +87,9 @@ def read_writer_basic(df, r1, r2, gen_name, args):
 
     for idx, i in enumerate(df):
         for j in range(i[3]):
-            a1 = random.choice(args.a1)
-            a2 = random.choice(args.a2)
-            r1_seq = a1[0] + i[0] + a2[1]
-            r2_seq = a2[0] + i[1] + a1[1]
-            r1_seq = r1_seq[a1s:a1e].ljust(args.l, 'G')
-            r2_seq = r2_seq[a2s:a2e].ljust(args.l, 'G')
-            full = len(r1_seq)
+            a1, a2, r1_seq, r2_seq, full = create_seq(i, a1s, a1e, a2s, a2e, args)
             header = f'@{r_no}:{idx}:{full}:{i[2]}:{a1[2]}:{a2[2]}:{gen_name}'
             r1.write(f'{header} 1\n{r1_seq}\n+\n{score}\n')
             r2.write(f'{header} 2\n{r2_seq}\n+\n{score}\n')
+            r_no += 1
+
