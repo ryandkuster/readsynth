@@ -8,6 +8,37 @@ Readsynth is aimed at standardizing reduced-metagenome sequencing (RMS) librarie
 ## what makes readsynth different?
 The preparation of DNA sequencing libraries include many variables which influence the frequency of a given read, including restriction enzyme site frequency in the sample genome(s), enzyme digestion efficiency, size-selection, as well as PCR bias based on DNA fragment length. Readsynth allows users to control common sources of variability introduced in typical enzymatic library preparations (e.g. RADseq, ddRADseq, GBS, etc.).
 
+## requirements
+Python packages numpy, pandas, and seaborn
+To install using pip:
+```
+python3 -m pip install numpy
+python3 -m pip install pandas
+python3 -m pip install seaborn
+```
+
+To install using conda (in a conda environment):
+```
+conda install numpy
+conda install pandas
+conda install seaborn
+```
+
+Command line core utilities, specifically 'shuf'. To see if shuf is available on your system, try:
+```
+shuf --help
+```
+
+To install coreutils on macOS:
+```
+brew install coreutils
+```
+
+To install coreutils using the apt package manager:
+```
+sudo apt-get -y install coreutils
+```
+
 ## usage
 
 **inputs**
