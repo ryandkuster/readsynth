@@ -16,6 +16,7 @@ import time
 
 import scripts.prob_n_copies as prob_n_copies
 import scripts.digest_genomes as digest_genomes
+import scripts.digest_genomes_iic as digest_genomes_iic
 import scripts.size_selection as size_selection
 import scripts.write_reads as write_reads
 
@@ -35,14 +36,17 @@ def parse_user_input():
     parser.add_argument('-o', type=str, required=True,
             help='path to store output')
 
-    parser.add_argument('-m1', type=str, required=True, nargs='+',
+    parser.add_argument('-m1', type=str, required='-iic' not in sys.argv, nargs='+',
             help='space separated list of RE motifs (e.g., AluI or AG/CT, HindIII or A/AGCTT, SmlI or C/TYRAG)')
 
-    parser.add_argument('-m2', type=str, required=True, nargs='+',
+    parser.add_argument('-m2', type=str, required='-iic' not in sys.argv, nargs='+',
             help='space separated list of RE motifs (e.g., AluI or AG/CT, HindIII or A/AGCTT, SmlI or C/TYRAG)')
+
+    parser.add_argument('-iic', type=str, required=False,
+            help='optional type IIC RE motif (e.g., NN/NNNNNNNNNNCGANNNNNNTGCNNNNNNNNNNNN/)')
 
     parser.add_argument('-l', type=int, required=True,
-            help='desired read length of final simulated reads (defaults to 250 or given q1/q2 profiles)')
+            help='desired read length of final simulated reads')
 
     parser.add_argument('-test', dest='test', action='store_true',
             help='test mode: create newline-separated file of RE digested sequences only')
@@ -55,9 +59,6 @@ def parse_user_input():
 
     parser.add_argument('-up_bound', type=int, required=True,
             help='the upper end of a range (in bp) of read lengths to size select')
-
-    parser.add_argument('-min', type=int, required=False,
-            help='min distance between cuts (optional, defaults to 6bp)')
 
     parser.add_argument('-max', type=int, required=False,
             help='max fragment length after first cut (optional, defaults to mean + 6 stdevs)')
@@ -93,11 +94,15 @@ def parse_user_input():
 
 def check_for_enzymes(args):
     with open(os.path.join(os.path.dirname(__file__),
-              'resources/type_ii_enzymes.pickle'), 'rb') as type_ii_file:
-        re_dt = pickle.load(type_ii_file)
+              'resources/type_iip_enzymes.pickle'), 'rb') as type_iip_file:
+        re_dt = pickle.load(type_iip_file)
+
+    #TODO add IIC enzyme pickle here
 
     m1 = [re_dt[i.lower()] if i.lower() in re_dt.keys() else i for i in args.m1]
     m2 = [re_dt[i.lower()] if i.lower() in re_dt.keys() else i for i in args.m2]
+
+    #TODO return re_type here (e.g. "IIC")
 
     return m1, m2
 
@@ -131,6 +136,43 @@ def iupac_motifs(arg_m):
         for char in motif.upper():
             reg_motif += iupac_dt[char]
         motif_dt[reg_motif] = motif.index('/')
+
+    return motif_dt
+
+
+def iupac_motifs_iic(arg_m):
+    '''
+    given a list of RE cut motifs, return a dictionary of regex
+    compatible iupac redundancy codes as keys and cleaving site
+    as the value
+    '''
+    motif_dt = {}
+    iupac_dt = {'/': '',
+                'A': 'A',
+                'C': 'C',
+                'G': 'G',
+                'T': 'T',
+                'R': '[AG]',
+                'Y': '[CT]',
+                'S': '[GC]',
+                'W': '[AT]',
+                'K': '[GT]',
+                'M': '[AC]',
+                'B': '[CGT]',
+                'D': '[AGT]',
+                'H': '[ACT]',
+                'V': '[ACG]',
+                'N': '[ACGT]'}
+
+    print(arg_m)
+    arg_m.extend([reverse_comp(i) for i in arg_m])
+
+    for motif in arg_m:
+        reg_motif = ''
+        for char in motif.upper():
+            reg_motif += iupac_dt[char]
+        motif_dt[reg_motif] = [m.start() for m in re.finditer('/', motif)]
+        motif_dt[reg_motif][-1] = motif_dt[reg_motif][-1] - 1
 
     return motif_dt
 
@@ -179,6 +221,10 @@ def open_fastq(fastq, args):
 
 
 def check_genomes(genome_file):
+    '''
+    open 'genome_file' abundance profile
+    assert each fasta file exists as listed
+    '''
     df = pd.read_csv(genome_file, names=['genome', 'abundance'])
     df['abundance'] = df['abundance'] / df['abundance'].sum()
 
@@ -189,7 +235,7 @@ def check_genomes(genome_file):
     return df
 
 
-def process_genomes(args, genomes_df):
+def process_genomes_IIP(args, genomes_df):
     digest_ls, prob_ls = [], []
     total_freqs = pd.DataFrame(columns=['length', 'sum_prob', 'name', 'counts_file'])
 
@@ -220,11 +266,45 @@ def process_genomes(args, genomes_df):
     return genomes_df, total_freqs
 
 
+def process_genomes_IIC(args, genomes_df):
+    digest_ls, prob_ls = [], []
+    total_freqs = pd.DataFrame(columns=['length', 'sum_prob', 'name', 'counts_file'])
+
+    for idx in range(genomes_df.shape[0]):
+        args.genome = genomes_df.iloc[idx]['genome']
+        args.comp = genomes_df.iloc[idx]['abundance']
+        digest_file = os.path.join(args.o, 'raw_digest_' +
+                os.path.basename(args.genome) + '.csv')
+
+        print(f'processing genome {os.path.basename(args.genome)}')
+        df = digest_genomes_iic.main(args)
+        print(df)
+        digest_file = process_df_iic(df, digest_file, args)
+        sys.exit()
+        #prob_file, len_freqs = prob_n_copies.main(digest_file, args)
+
+        #save_individual_hist(prob_file, args)
+
+        #digest_ls.append(digest_file)
+        #prob_ls.append(prob_file)
+        #tmp_df = pd.DataFrame(len_freqs.items(), columns=['length', 'sum_prob'])
+        #tmp_df['name'] = os.path.basename(args.genome)
+        #tmp_df['counts_file'] = prob_file
+        #total_freqs = pd.concat([total_freqs, tmp_df], axis=0)
+
+    total_freqs = total_freqs.reset_index(drop=True)
+    genomes_df['digest_file'] = digest_ls
+    genomes_df['prob_file'] = prob_ls
+
+    return genomes_df, total_freqs
+
+
 def reverse_comp(seq):
     '''
     return the reverse complement of an input sequence
     '''
-    revc = {'A': 'T', 'C': 'G', 'G': 'C', 'T': 'A',
+    revc = {'/': '/',
+            'A': 'T', 'C': 'G', 'G': 'C', 'T': 'A',
             'R': 'Y', 'Y': 'R', 'S': 'S', 'W': 'W', 'K': 'M', 'M': 'K',
             'B': 'V', 'D': 'H', 'H': 'D', 'V': 'B',
             'N': 'N'}
@@ -305,10 +385,76 @@ def process_df(df, digest_file, args):
     return digest_file
 
 
+def process_df_iic(df, digest_file, args):
+    df['forward'] = np.where(df['m1'] == list(args.motif_dt.keys())[0], 1, 0)
+    df['reverse'] = np.where(df['m1'] == list(args.motif_dt.keys())[1], 1, 0)
+
+    print(df) #TODO
+    sys.exit() #TODO LEFT OFF HERE
+
+    # convert all redundant IUPAC codes to 'N'
+    df['seq'] = df['seq'].str.replace('[RYSWKMBDHV]','N')
+
+    # create a column of reverse complement sequences
+    df['revc'] = [reverse_comp(i) for i in df['seq'].to_list()]
+
+    # duplicate all the reads that work both ways (if RE in m1 and m2)
+    tmp_df = df[(df['forward'] == 1) & (df['reverse'] == 1)]
+    tmp_df = tmp_df.reset_index(drop=True)
+
+    # recategorize the seqs in df as being forward
+    df.loc[(df['forward'] == 1) & (df['reverse'] == 1), 'reverse'] = 0
+
+    # convert remaining reverse strand sequences to the reverse complement
+    df.loc[df['reverse'] == 1, 'tmp_seq'] = df['revc']
+    df.loc[df['reverse'] == 1, 'revc'] = df['seq']
+    df.loc[df['reverse'] == 1, 'seq'] = df['tmp_seq']
+    df.drop('tmp_seq', axis=1, inplace=True)
+
+    # make all tmp_df reads reverse complements and recategorize as reverse
+    tmp_df['seq'] = tmp_df['revc'].values
+    tmp_df.loc[:,'forward'] = 0
+    tmp_df.loc[:,'reverse'] = 1
+
+    df = pd.concat([df, tmp_df])
+    df.drop('forward', axis=1, inplace=True)
+    df = df.reset_index(drop=True)
+
+    # add a quick step that removes appropriate over/underhang
+    for mot, front in args.motif_dt.items():
+        back = len(mot) - front
+        df.loc[(df['m1'] == mot) & (df['reverse'] == 0), 'seq'] = \
+                df['seq'].str[front:]
+        df.loc[(df['m1'] == mot) & (df['reverse'] == 0), 'revc'] = \
+                df['revc'].str[:-back]
+
+        df.loc[(df['m1'] == mot) & (df['reverse'] == 1), 'seq'] = \
+                df['seq'].str[:-back]
+        df.loc[(df['m1'] == mot) & (df['reverse'] == 1), 'revc'] = \
+                df['revc'].str[front:]
+
+        df.loc[(df['m2'] == mot) & (df['reverse'] == 0), 'seq'] = \
+                df['seq'].str[:-back]
+        df.loc[(df['m2'] == mot) & (df['reverse'] == 0), 'revc'] = \
+                df['revc'].str[front:]
+
+        df.loc[(df['m2'] == mot) & (df['reverse'] == 1), 'seq'] = \
+                df['seq'].str[front:]
+        df.loc[(df['m2'] == mot) & (df['reverse'] == 1), 'revc'] = \
+                df['revc'].str[:-back]
+
+    df['length'] = df['seq'].str.len()
+    df = df.sort_values(by=['length'])
+    df = df.reset_index(drop=True)
+    df.to_csv(digest_file, index=None)
+
+    return digest_file
+
+
 def save_individual_hist(prob_file, args):
     df = pd.read_csv(prob_file)
     if df.shape[0] == 0:
-        print(f'no fragments found in {read_file}')
+        print(f'no fragments found in {prob_file}')
         return
 
     sns.histplot(data=df, x=df['length'], binwidth=6,
@@ -420,16 +566,18 @@ if __name__ == '__main__':
     else:
         sys.exit('directory not found at ' + os.path.abspath(args.o))
 
-    args.m1, args.m2 = check_for_enzymes(args)
-    args.motif_dt = {}
-    args.motif_dt1 = iupac_motifs(args.m1)
-    args.motif_dt.update(args.motif_dt1)
-    args.motif_dt2 = iupac_motifs(args.m2)
-    args.motif_dt.update(args.motif_dt2)
+    if args.iic:
+        args.motif_dt = iupac_motifs_iic([args.iic])
+    else:
+        args.motif_dt = {}
+        args.m1, args.m2 = check_for_enzymes(args)
+        args.motif_dt1 = iupac_motifs(args.m1)
+        args.motif_dt.update(args.motif_dt1)
+        args.motif_dt2 = iupac_motifs(args.m2)
+        args.motif_dt.update(args.motif_dt2)
 
     args.sd = int(round(0.08*args.mean, 0)) # using Sage Science CV of 8%
     args.sd = max(args.sd, int(round((args.up_bound - args.mean)/2, 0)))
-    args.min = args.min if args.min else 6
     args.max = args.max if args.max else (args.mean + (6*args.sd))
 
     if args.a1:
@@ -453,7 +601,10 @@ if __name__ == '__main__':
     digest genomes one by one, producing raw digest files
     '''
     genomes_df = check_genomes(args.genome)
-    genomes_df, total_freqs = process_genomes(args, genomes_df)
+    print(args.motif_dt) #TODO
+    if args.iic:
+        genomes_df, total_freqs = process_genomes_IIC(args, genomes_df)
+    genomes_df, total_freqs = process_genomes_IIP(args, genomes_df)
     save_combined_hist(total_freqs, 'fragment_distributions', 'sum_prob', args)
 
     '''

@@ -6,7 +6,7 @@ import unittest
 
 sys.path.append("../")
 import readsynth as rs
-import digest_genomes as dg
+import scripts.digest_genomes as dg
 
 '''
 usage:
@@ -141,19 +141,19 @@ class TestInitFunctions(unittest.TestCase):
 
 class TestProcessing(unittest.TestCase):
 
-    def test_process_genomes_1(self):
-        '''
-        '''
-        args = Variables()
-        args.genome = 'test_project3/metagenome_file.csv'
-        args.o = 'test_project3'
-        args.motif_dt = {'TTAA': 1, 'GCGC': 3}
-        args.motif_dt1 = {'TTAA': 1}
-        args.motif_dt2 = {'GCGC': 3}
-        args.cut_prob = 1
-        genomes_df = pd.read_csv('test_project3/metagenome_file_df.csv')
-        genomes_df, total_freqs = rs.process_genomes(args, genomes_df)
-#        self.assertEqual(args.m1[0], expected)
+#    def test_process_genomes_1(self):
+#        '''
+#        '''
+#        args = Variables()
+#        args.genome = 'test_project3/metagenome_file.csv'
+#        args.o = 'test_project3'
+#        args.motif_dt = {'TTAA': 1, 'GCGC': 3}
+#        args.motif_dt1 = {'TTAA': 1}
+#        args.motif_dt2 = {'GCGC': 3}
+#        args.cut_prob = 1
+#        genomes_df = pd.read_csv('test_project3/metagenome_file_df.csv')
+#        genomes_df, total_freqs = rs.process_genomes(args, genomes_df)
+##        self.assertEqual(args.m1[0], expected)
 
     def test_process_genomes_2(self):
         '''
@@ -168,7 +168,6 @@ class TestProcessing(unittest.TestCase):
         genomes_df = pd.read_csv('test_project4/metagenome_file_df.csv')
         genomes_df, total_freqs = rs.process_genomes(args, genomes_df)
         df = pd.read_csv('test_project4/raw_digest_Escherichia_coli_plasmid.fasta.csv')
-        print(df)
 #        self.assertEqual(args.m1[0], expected)
 
 
