@@ -61,8 +61,8 @@ def digest_seq(begin, seq, motif_dt, frag_len):
             end = start + mot_len
             fragment = seq[start: end]
             seq_ls.append([fragment,
-                            start,
-                            end,
+                            begin+start,
+                            begin+end,
                             motif1,
                             motif1,
                             0])

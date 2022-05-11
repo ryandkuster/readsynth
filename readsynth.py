@@ -14,12 +14,13 @@ import subprocess
 import sys
 import time
 
-import scripts.prob_n_copies as prob_n_copies
 import scripts.digest_genomes as digest_genomes
-import scripts.digest_genomes_iic as digest_genomes_iic
+import scripts.prob_n_copies as prob_n_copies
 import scripts.size_selection as size_selection
 import scripts.write_reads as write_reads
 
+import scripts.digest_genomes_iso as digest_genomes_iso
+import scripts.prob_n_copies_iso as prob_n_copies_iso
 
 #class taxa():
 #
@@ -36,13 +37,13 @@ def parse_user_input():
     parser.add_argument('-o', type=str, required=True,
             help='path to store output')
 
-    parser.add_argument('-m1', type=str, required='-iic' not in sys.argv, nargs='+',
+    parser.add_argument('-m1', type=str, required='-iso' not in sys.argv, nargs='+',
             help='space separated list of RE motifs (e.g., AluI or AG/CT, HindIII or A/AGCTT, SmlI or C/TYRAG)')
 
-    parser.add_argument('-m2', type=str, required='-iic' not in sys.argv, nargs='+',
+    parser.add_argument('-m2', type=str, required='-iso' not in sys.argv, nargs='+',
             help='space separated list of RE motifs (e.g., AluI or AG/CT, HindIII or A/AGCTT, SmlI or C/TYRAG)')
 
-    parser.add_argument('-iic', type=str, required=False,
+    parser.add_argument('-iso', type=str, required=False,
             help='optional type IIC RE motif (e.g., NN/NNNNNNNNNNCGANNNNNNTGCNNNNNNNNNNNN/)')
 
     parser.add_argument('-l', type=int, required=True,
@@ -140,7 +141,7 @@ def iupac_motifs(arg_m):
     return motif_dt
 
 
-def iupac_motifs_iic(arg_m):
+def iupac_motifs_iso(arg_m):
     '''
     given a list of RE cut motifs, return a dictionary of regex
     compatible iupac redundancy codes as keys and cleaving site
@@ -164,7 +165,6 @@ def iupac_motifs_iic(arg_m):
                 'V': '[ACG]',
                 'N': '[ACGT]'}
 
-    print(arg_m)
     arg_m.extend([reverse_comp(i) for i in arg_m])
 
     for motif in arg_m:
@@ -235,7 +235,7 @@ def check_genomes(genome_file):
     return df
 
 
-def process_genomes_IIP(args, genomes_df):
+def process_genomes(args, genomes_df):
     digest_ls, prob_ls = [], []
     total_freqs = pd.DataFrame(columns=['length', 'sum_prob', 'name', 'counts_file'])
 
@@ -266,7 +266,7 @@ def process_genomes_IIP(args, genomes_df):
     return genomes_df, total_freqs
 
 
-def process_genomes_IIC(args, genomes_df):
+def process_genomes_iso(args, genomes_df):
     digest_ls, prob_ls = [], []
     total_freqs = pd.DataFrame(columns=['length', 'sum_prob', 'name', 'counts_file'])
 
@@ -277,13 +277,10 @@ def process_genomes_IIC(args, genomes_df):
                 os.path.basename(args.genome) + '.csv')
 
         print(f'processing genome {os.path.basename(args.genome)}')
-        df = digest_genomes_iic.main(args)
-        print(df)
-        digest_file = process_df_iic(df, digest_file, args)
+        df = digest_genomes_iso.main(args)
+        digest_file = process_df_iso(df, digest_file, args)
+        prob_file  = prob_n_copies_iso.main(digest_file, args)
         sys.exit()
-        #prob_file, len_freqs = prob_n_copies.main(digest_file, args)
-
-        #save_individual_hist(prob_file, args)
 
         #digest_ls.append(digest_file)
         #prob_ls.append(prob_file)
@@ -336,7 +333,7 @@ def process_df(df, digest_file, args):
     tmp_df = df[(df['forward'] == 1) & (df['reverse'] == 1)]
     tmp_df = tmp_df.reset_index(drop=True)
 
-    # recategorize the seqs in df as being forward
+    # recategorize the bidirectional seqs in df as being forward
     df.loc[(df['forward'] == 1) & (df['reverse'] == 1), 'reverse'] = 0
 
     # convert remaining reverse strand sequences to the reverse complement
@@ -346,7 +343,10 @@ def process_df(df, digest_file, args):
     df.drop('tmp_seq', axis=1, inplace=True)
 
     # make all tmp_df reads reverse complements and recategorize as reverse
-    tmp_df['seq'] = tmp_df['revc'].values
+    tmp_df['tmp_seq'] = tmp_df['revc'].values
+    tmp_df['revc'] = tmp_df['seq'].values
+    tmp_df['seq'] = tmp_df['tmp_seq'].values
+    tmp_df.drop('tmp_seq', axis=1, inplace=True)
     tmp_df.loc[:,'forward'] = 0
     tmp_df.loc[:,'reverse'] = 1
 
@@ -385,12 +385,10 @@ def process_df(df, digest_file, args):
     return digest_file
 
 
-def process_df_iic(df, digest_file, args):
+def process_df_iso(df, digest_file, args):
     df['forward'] = np.where(df['m1'] == list(args.motif_dt.keys())[0], 1, 0)
     df['reverse'] = np.where(df['m1'] == list(args.motif_dt.keys())[1], 1, 0)
 
-    print(df) #TODO
-    sys.exit() #TODO LEFT OFF HERE
 
     # convert all redundant IUPAC codes to 'N'
     df['seq'] = df['seq'].str.replace('[RYSWKMBDHV]','N')
@@ -398,53 +396,26 @@ def process_df_iic(df, digest_file, args):
     # create a column of reverse complement sequences
     df['revc'] = [reverse_comp(i) for i in df['seq'].to_list()]
 
-    # duplicate all the reads that work both ways (if RE in m1 and m2)
-    tmp_df = df[(df['forward'] == 1) & (df['reverse'] == 1)]
-    tmp_df = tmp_df.reset_index(drop=True)
+    # swap seq and revc for fragments on the reverse direction
+    tmp_df = df['reverse'] == 1
+    df.loc[tmp_df, ['seq', 'revc']] = (df.loc[tmp_df, ['revc', 'seq']].values)
 
-    # recategorize the seqs in df as being forward
-    df.loc[(df['forward'] == 1) & (df['reverse'] == 1), 'reverse'] = 0
-
-    # convert remaining reverse strand sequences to the reverse complement
-    df.loc[df['reverse'] == 1, 'tmp_seq'] = df['revc']
-    df.loc[df['reverse'] == 1, 'revc'] = df['seq']
-    df.loc[df['reverse'] == 1, 'seq'] = df['tmp_seq']
-    df.drop('tmp_seq', axis=1, inplace=True)
-
-    # make all tmp_df reads reverse complements and recategorize as reverse
-    tmp_df['seq'] = tmp_df['revc'].values
-    tmp_df.loc[:,'forward'] = 0
-    tmp_df.loc[:,'reverse'] = 1
-
-    df = pd.concat([df, tmp_df])
     df.drop('forward', axis=1, inplace=True)
     df = df.reset_index(drop=True)
 
     # add a quick step that removes appropriate over/underhang
-    for mot, front in args.motif_dt.items():
-        back = len(mot) - front
-        df.loc[(df['m1'] == mot) & (df['reverse'] == 0), 'seq'] = \
-                df['seq'].str[front:]
-        df.loc[(df['m1'] == mot) & (df['reverse'] == 0), 'revc'] = \
-                df['revc'].str[:-back]
+    m1 = list(args.motif_dt.keys())[0]
+    m1_f = args.motif_dt[m1][0]
+    m1_b = args.motif_dt[m1][1]
+    m2 = list(args.motif_dt.keys())[1]
+    m2_f = args.motif_dt[m2][0]
+    m2_b = args.motif_dt[m2][1]
 
-        df.loc[(df['m1'] == mot) & (df['reverse'] == 1), 'seq'] = \
-                df['seq'].str[:-back]
-        df.loc[(df['m1'] == mot) & (df['reverse'] == 1), 'revc'] = \
-                df['revc'].str[front:]
-
-        df.loc[(df['m2'] == mot) & (df['reverse'] == 0), 'seq'] = \
-                df['seq'].str[:-back]
-        df.loc[(df['m2'] == mot) & (df['reverse'] == 0), 'revc'] = \
-                df['revc'].str[front:]
-
-        df.loc[(df['m2'] == mot) & (df['reverse'] == 1), 'seq'] = \
-                df['seq'].str[front:]
-        df.loc[(df['m2'] == mot) & (df['reverse'] == 1), 'revc'] = \
-                df['revc'].str[:-back]
+    df['seq'] = df['seq'].str[m1_f:m1_b]
+    df['revc'] = df['revc'].str[m2_f:m2_b]
 
     df['length'] = df['seq'].str.len()
-    df = df.sort_values(by=['length'])
+    df = df.sort_values(by=['start'])
     df = df.reset_index(drop=True)
     df.to_csv(digest_file, index=None)
 
@@ -457,16 +428,21 @@ def save_individual_hist(prob_file, args):
         print(f'no fragments found in {prob_file}')
         return
 
-    sns.histplot(data=df, x=df['length'], binwidth=6,
-                 alpha=0.75, color='red')
-    sns.histplot(data=df, x=df['length'], weights=df['probability'], binwidth=6,
-                 alpha=0.75, color='gold')
-    sns.histplot(data=df, x=df['length'], weights=df['adj_prob'], binwidth=6,
-                 alpha=0.75, color='blue')
-    plt.savefig(os.path.join(args.o, 'hist_' + os.path.basename(prob_file)[:-4] +
-                '.png'),
-                 facecolor='white', transparent=False)
-    plt.close()
+    try:
+        sns.histplot(data=df, x=df['length'], binwidth=6,
+                     alpha=0.75, color='red')
+        sns.histplot(data=df, x=df['length'], weights=df['probability'], binwidth=6,
+                     alpha=0.75, color='gold')
+        sns.histplot(data=df, x=df['length'], weights=df['adj_prob'], binwidth=6,
+                     alpha=0.75, color='blue')
+        plt.savefig(os.path.join(args.o, 'hist_' + os.path.basename(prob_file)[:-4] +
+                    '.png'),
+                     facecolor='white', transparent=False)
+        plt.close()
+
+    except ValueError:
+        print(f'too few bins to produce histogram for {prob_file}')
+        return
 
 
 def save_combined_hist(total_freqs, image_name, weights, args):
@@ -566,8 +542,8 @@ if __name__ == '__main__':
     else:
         sys.exit('directory not found at ' + os.path.abspath(args.o))
 
-    if args.iic:
-        args.motif_dt = iupac_motifs_iic([args.iic])
+    if args.iso:
+        args.motif_dt = iupac_motifs_iso([args.iso])
     else:
         args.motif_dt = {}
         args.m1, args.m2 = check_for_enzymes(args)
@@ -601,10 +577,10 @@ if __name__ == '__main__':
     digest genomes one by one, producing raw digest files
     '''
     genomes_df = check_genomes(args.genome)
-    print(args.motif_dt) #TODO
-    if args.iic:
-        genomes_df, total_freqs = process_genomes_IIC(args, genomes_df)
-    genomes_df, total_freqs = process_genomes_IIP(args, genomes_df)
+
+    if args.iso:
+        genomes_df, total_freqs = process_genomes_iso(args, genomes_df)
+    genomes_df, total_freqs = process_genomes(args, genomes_df)
     save_combined_hist(total_freqs, 'fragment_distributions', 'sum_prob', args)
 
     '''
