@@ -86,4 +86,3 @@ def get_query_len(query):
 
 
 
-

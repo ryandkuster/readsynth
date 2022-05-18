@@ -13,13 +13,20 @@ def main(df, args):
     that includes enough counts in the mean+2sd range to include a 1X
     coverage of the genome
 
+    scale_by is the density of all fragments at the point x that is the
+    upper_bound defined by the user; this value is approximately the
+    expected counts of fragments this length over all genomes assuming
+    1X copies of each genome followed by adjustment for composition
+
     fragment_comps:
     the composition, or relative rate of occurence, per fragment length,
-    across the entirety of input genome digests
+    across the entirety of input genome digests (ie for each length, this
+    value should fall between 0 and 1 and determines the percent of reads
+    this size to be produced from size selection)
 
     adjustment:
     based on the sum of all possible fragment occurences, adjusts the
-    value of -n (total read count) to accound for fragment totals that
+    value of -n (total read count) to account for fragment totals that
     are > or < than n (e.g. for 1,000,000 total reads, 100,000 size-selected
     fragments will adjust the weight of each read to 10, while 10,000,000
     fragments will need to be adjusted to 0.1)
@@ -90,7 +97,15 @@ def length_dict(df, mean, sd):
 
 def get_draw_dict(mean, sd, len_dt, scale_by):
     '''
-    create a dictionary of draw numbers
+    create a dictionary of draw numbers in the range 0 to the maximum
+    fragment length based on the Gaussian probability density function
+    at a given point, x
+
+    scale_by changes the density for a point (probabilities sum to 1) to
+    the units of adj_prob from the compositional dataset
+
+    at the intersection of the above distribution and the possible
+    fragments produced by digestion, take the minimum count for each x
     '''
     draw_dt = {}
 

@@ -53,7 +53,6 @@ def get_copies(copies_dt, internal):
 
 
 def get_len_freqs(df, max_len):
-    pass
     len_freqs = {}
 
     for i in range(0, max_len+1):

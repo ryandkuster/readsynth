@@ -1,8 +1,12 @@
-#
+#!/usr/bin/env python
+
 import math
 import sys
 
 '''
+this script compares two fastq sequence files for SNPs and prodcues
+an prints a summary of differences
+
 sys.argv[1] is the original sim file, no errors
 sys.argv[2] is the error-induced reads
 '''

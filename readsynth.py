@@ -143,9 +143,11 @@ def iupac_motifs(arg_m):
 
 def iupac_motifs_iso(arg_m):
     '''
-    given a list of RE cut motifs, return a dictionary of regex
-    compatible iupac redundancy codes as keys and cleaving site
-    as the value
+    given a single iso-length cut motif, return a dictionary of regex
+    compatible iupac redundancy codes as keys and a list of the two
+    cleaving sites as the value
+
+    the reverse complement is considered as these are not palindromic
     '''
     motif_dt = {}
     iupac_dt = {'/': '',
@@ -177,12 +179,12 @@ def iupac_motifs_iso(arg_m):
     return motif_dt
 
 
-def get_adapters(arg):
+def get_adapters(adapter_file):
     """
     open adapters file and store adapters and barcodes in list of tuples
     """
     adapters_ls = []
-    with open(arg) as f:
+    with open(adapter_file) as f:
         for line in f:
             a_top, a_bot, a_id = line.rstrip().split()
             adapters_ls.append((a_top, a_bot, a_id))
@@ -236,6 +238,14 @@ def check_genomes(genome_file):
 
 
 def process_genomes(args, genomes_df):
+    '''
+    len_freqs is a dictionary where each key is a fragment length from
+    a digested genome, the value is the sum of all fragment probabilities
+    for that length after adjusting for composition and size selection
+
+    total_freqs collects the frequency for fragment lengths from all the
+    genomes to be processed
+    '''
     digest_ls, prob_ls = [], []
     total_freqs = pd.DataFrame(columns=['length', 'sum_prob', 'name', 'counts_file'])
 
@@ -267,6 +277,14 @@ def process_genomes(args, genomes_df):
 
 
 def process_genomes_iso(args, genomes_df):
+    '''
+    len_freqs is a dictionary where each key is a fragment length from
+    a digested genome, the value is the sum of all fragment probabilities
+    for that length after adjusting for composition and size selection
+
+    total_freqs collects the frequency for fragment lengths from all the
+    genomes to be processed
+    '''
     digest_ls, prob_ls = [], []
     total_freqs = pd.DataFrame(columns=['length', 'sum_prob', 'name', 'counts_file'])
 
@@ -279,15 +297,13 @@ def process_genomes_iso(args, genomes_df):
         print(f'processing genome {os.path.basename(args.genome)}')
         df = digest_genomes_iso.main(args)
         digest_file = process_df_iso(df, digest_file, args)
-        prob_file  = prob_n_copies_iso.main(digest_file, args)
-        sys.exit()
-
-        #digest_ls.append(digest_file)
-        #prob_ls.append(prob_file)
-        #tmp_df = pd.DataFrame(len_freqs.items(), columns=['length', 'sum_prob'])
-        #tmp_df['name'] = os.path.basename(args.genome)
-        #tmp_df['counts_file'] = prob_file
-        #total_freqs = pd.concat([total_freqs, tmp_df], axis=0)
+        prob_file, len_freqs  = prob_n_copies_iso.main(digest_file, args)
+        digest_ls.append(digest_file)
+        prob_ls.append(prob_file)
+        tmp_df = pd.DataFrame(len_freqs.items(), columns=['length', 'sum_prob'])
+        tmp_df['name'] = os.path.basename(args.genome)
+        tmp_df['counts_file'] = prob_file
+        total_freqs = pd.concat([total_freqs, tmp_df], axis=0)
 
     total_freqs = total_freqs.reset_index(drop=True)
     genomes_df['digest_file'] = digest_ls
@@ -580,7 +596,9 @@ if __name__ == '__main__':
 
     if args.iso:
         genomes_df, total_freqs = process_genomes_iso(args, genomes_df)
-    genomes_df, total_freqs = process_genomes(args, genomes_df)
+    else:
+        genomes_df, total_freqs = process_genomes(args, genomes_df)
+
     save_combined_hist(total_freqs, 'fragment_distributions', 'sum_prob', args)
 
     '''
@@ -589,11 +607,20 @@ if __name__ == '__main__':
     and perform simulation of pooled size selection
     '''
     print('simulating size selection')
-    fragment_comps, adjustment = size_selection.main(total_freqs, args)
+    if args.iso:
+        fragment_comps = total_freqs.groupby('length')['sum_prob'].apply(list).to_dict()
+        fragment_comps = {k: sum(v) for k, v in fragment_comps.items()}
+        adjustment = args.n / sum(fragment_comps.values())
+        fragment_comps = {k: 1 if v > 0 else 0 for k, v in fragment_comps.items()}
+    else:
+        fragment_comps, adjustment = size_selection.main(total_freqs, args)
+
     total_freqs['counts'] = total_freqs['length'].map(fragment_comps)
     total_freqs['counts'] = round(total_freqs['counts'] * total_freqs['sum_prob'] \
                           * adjustment)
+
     print(total_freqs['counts'].sum())
+
     comb_file = os.path.join(args.o, 'combined.csv')
     total_freqs.to_csv(comb_file)
     save_combined_hist(total_freqs, 'read_distributions', 'counts', args)

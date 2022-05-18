@@ -11,6 +11,7 @@ import scripts.digest_genomes as dg
 '''
 usage:
 python3 -m unittest test_readsynth.py
+
 '''
 
 
@@ -102,13 +103,24 @@ class TestInitFunctions(unittest.TestCase):
         motif_dt = rs.iupac_motifs(args.m1)
         self.assertEqual(motif_dt, expected)
 
+    def test_iupac_motifs_iso_1(self):
+        '''
+        given 'NN/NNNNNNNNNNCGANNNNNNTGCNNNNNNNNNNNN/'
+        expected:
+            dictionary with sequence as key
+            index of '/' is the value
+        '''
+        args = Variables()
+        args.iso = ['NN/NNNNNNNNNNCGANNNNNNTGCNNNNNNNNNNNN/']
+        expected = {'[ACGT][ACGT][ACGT][ACGT][ACGT][ACGT][ACGT][ACGT][ACGT][ACGT][ACGT][ACGT]CGA[ACGT][ACGT][ACGT][ACGT][ACGT][ACGT]TGC[ACGT][ACGT][ACGT][ACGT][ACGT][ACGT][ACGT][ACGT][ACGT][ACGT][ACGT][ACGT]': [2, 36],
+                    '[ACGT][ACGT][ACGT][ACGT][ACGT][ACGT][ACGT][ACGT][ACGT][ACGT][ACGT][ACGT]GCA[ACGT][ACGT][ACGT][ACGT][ACGT][ACGT]TCG[ACGT][ACGT][ACGT][ACGT][ACGT][ACGT][ACGT][ACGT][ACGT][ACGT][ACGT][ACGT]': [0, 34]}
+        motif_dt = rs.iupac_motifs_iso(args.iso)
+        self.assertEqual(motif_dt, expected)
+
     def test_get_adapters_1(self):
         pass
 
     def test_get_sbs_start_1(self):
-        pass
-
-    def test_get_qscores_1(self):
         pass
 
     def test_open_fastq_1(self):
@@ -140,6 +152,17 @@ class TestInitFunctions(unittest.TestCase):
 
 
 class TestProcessing(unittest.TestCase):
+    '''
+    smoke tests for simple processing pipeline examples
+
+    tests to perform:
+        identical RE for m1/m2
+        different RE for m1/m2
+        nested RE for m1/m2 (identical)
+        nested RE for m1/m2 (different)
+        iso RE cutter (standard cut regions)
+        iso RE cutter (overlapping cut regions)
+    '''
 
 #    def test_process_genomes_1(self):
 #        '''
@@ -173,6 +196,7 @@ class TestProcessing(unittest.TestCase):
 
     def test_reverse_comp_1(self):
         '''
+        test basic reverse complementarity function
         '''
         seq = 'ACGTN'
         expected = 'NACGT'
@@ -181,6 +205,7 @@ class TestProcessing(unittest.TestCase):
 
     def test_reverse_comp_2(self):
         '''
+        test redundant IUPAC reverse complementarity function
         '''
         seq = 'RVDAB'
         expected = 'VTHBY'
@@ -189,6 +214,7 @@ class TestProcessing(unittest.TestCase):
 
     def test_reverse_comp_3(self):
         '''
+        test highly redundant IUPAC reverse complementarity function
         '''
         seq = 'ACYGRYSCCTATTACNNCTNVBBVAYSR'
         expected = 'YSRTBVVBNAGNNGTAATAGGSRYCRGT'
@@ -199,7 +225,10 @@ class TestProcessing(unittest.TestCase):
 class TestDigestGenomes(unittest.TestCase):
 
     def test_dg_main_1(self):
-        pass
+        '''
+        digest test_project1/fake_genome_1.fasta and confirm number of
+        internal cut sites behaves as expected
+        '''
         args = Variables()
         args.genome = 'test_project1/fake_genome_1.fasta'
         args.motif_dt = {'TTAA': 1}
