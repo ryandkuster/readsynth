@@ -29,9 +29,9 @@ def main(args):
             gen_ls.extend(seq_ls)
             begin += len(seq)
             seq = ''
-            chr_name = line.rstrip()[1:].replace(' ', '_').replace(',','')
+            chr_name = line.rstrip()[1:].replace(' ', '_').replace(',', '')
         elif line.startswith('>'):
-            chr_name = line.rstrip()[1:].replace(' ', '_').replace(',','')
+            chr_name = line.rstrip()[1:].replace(' ', '_').replace(',', '')
         else:
             seq += line.rstrip().upper()
 
@@ -40,7 +40,8 @@ def main(args):
     begin += len(seq)
     fasta.close()
 
-    df = pd.DataFrame(gen_ls, columns=['seq', 'start', 'end', 'm1', 'm2', 'internal'])
+    df = pd.DataFrame(gen_ls,
+                      columns=['seq', 'start', 'end', 'm1', 'm2', 'internal'])
 
     return df
 
@@ -61,11 +62,11 @@ def digest_seq(begin, seq, motif_dt, frag_len):
             end = start + mot_len
             fragment = seq[start: end]
             seq_ls.append([fragment,
-                            begin+start,
-                            begin+end,
-                            motif1,
-                            motif1,
-                            0])
+                           begin+start,
+                           begin+end,
+                           motif1,
+                           motif1,
+                           0])
 
     return seq_ls
 
@@ -83,6 +84,3 @@ def get_query_len(query):
                 mot_len += 1
 
     return mot_len
-
-
-

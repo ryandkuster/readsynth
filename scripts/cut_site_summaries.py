@@ -3,7 +3,6 @@
 import argparse
 import gzip
 import os
-import pandas as pd
 import pickle
 import re
 
@@ -11,13 +10,13 @@ from scripts.gzip_test import test_unicode
 
 
 def main(args):
-    """
+    '''
     process fasta sequences as restricion enzyme fragments
 
     input args.genome is fasta
 
     output 'raw_digest' file holds all the resulting fragments
-    """
+    '''
 
     args.m1, args.m2 = check_for_enzymes(args)
     args.motif_dt = {}
@@ -32,12 +31,12 @@ def main(args):
         fasta = open(args.genome)
 
     begin, seq = 0, ''
-    seq_dt = {k:[] for k in args.motif_dt}
+    seq_dt = {k: [] for k in args.motif_dt}
 
     for line in fasta:
         if line.startswith('>') and seq:
             seq_dt_chrom = digest_seq(begin, seq, args.motif_dt)
-            seq_dt = {k:seq_dt[k] + v for k, v in seq_dt_chrom.items()}
+            seq_dt = {k: seq_dt[k] + v for k, v in seq_dt_chrom.items()}
             begin += len(seq)
             seq = ''
         elif line.startswith('>'):
@@ -46,7 +45,7 @@ def main(args):
             seq += line.rstrip().upper()
 
     seq_dt_chrom = digest_seq(begin, seq, args.motif_dt)
-    seq_dt = {k:seq_dt[k] + v for k, v in seq_dt_chrom.items()}
+    seq_dt = {k: seq_dt[k] + v for k, v in seq_dt_chrom.items()}
 
     fasta.close()
 
@@ -58,20 +57,21 @@ def parse_user_input():
     parser = argparse.ArgumentParser(description='simulate RAD libary')
 
     parser.add_argument('-genome', type=str, required=True,
-            help='path to file genome')
+                        help='path to file genome')
 
     parser.add_argument('-o', type=str, required=True,
-            help='path to store output')
+                        help='path to store output')
 
     parser.add_argument('-m1', type=str, required=True, nargs='+',
-            help='space separated list of RE motifs (e.g., AluI = AG/CT, HindIII = A/AGCTT, SmlI = C/TYRAG)')
+                        help='space separated list of RE motifs (e.g., AluI = AG/CT, HindIII = A/AGCTT, SmlI = C/TYRAG)')
 
     parser.add_argument('-m2', type=str, required=True, nargs='+',
-            help='space separated list of RE motifs (e.g., AluI = AG/CT, HindIII = A/AGCTT, SmlI = C/TYRAG)')
+                        help='space separated list of RE motifs (e.g., AluI = AG/CT, HindIII = A/AGCTT, SmlI = C/TYRAG)')
 
     args = parser.parse_args()
 
     return args
+
 
 def check_for_enzymes(args):
     with open(os.path.join(os.path.dirname(__file__),
@@ -118,13 +118,13 @@ def iupac_motifs(arg_m):
 
 
 def digest_seq(begin, seq, motif_dt):
-    """
+    '''
     for every chromosome (seq), find all RE recognition positions
     and preserve frag_len bp ahead as a possible template (fragment)
 
     each item in seq_ls is [sequence, start, end]
-    """
-    seq_dt_chrom = {k:[] for k in args.motif_dt}
+    '''
+    seq_dt_chrom = {k: [] for k in args.motif_dt}
     for motif1 in motif_dt.keys():
         for idx in re.finditer('(?=' + motif1 + ')', seq):
             start = idx.start()
@@ -136,4 +136,3 @@ def digest_seq(begin, seq, motif_dt):
 if __name__ == '__main__':
     args = parse_user_input()
     main(args)
-

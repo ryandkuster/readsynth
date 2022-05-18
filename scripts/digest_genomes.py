@@ -29,9 +29,9 @@ def main(args):
             gen_ls.extend(seq_ls)
             begin += len(seq)
             seq = ''
-            chr_name = line.rstrip()[1:].replace(' ', '_').replace(',','')
+            chr_name = line.rstrip()[1:].replace(' ', '_').replace(',', '')
         elif line.startswith('>'):
-            chr_name = line.rstrip()[1:].replace(' ', '_').replace(',','')
+            chr_name = line.rstrip()[1:].replace(' ', '_').replace(',', '')
         else:
             seq += line.rstrip().upper()
 
@@ -40,7 +40,8 @@ def main(args):
     begin += len(seq)
     fasta.close()
 
-    df = pd.DataFrame(gen_ls, columns=['seq', 'start', 'end', 'm1', 'm2', 'internal'])
+    df = pd.DataFrame(gen_ls,
+                      columns=['seq', 'start', 'end', 'm1', 'm2', 'internal'])
 
     return df
 
@@ -67,12 +68,14 @@ def digest_frag(fragment, motif_dt, motif1, f_start):
     further search each RE starting point + frag_len for more
     RE sites, return list of seq, start, end, m1, m2
     '''
-    frag_ls  = []
+    frag_ls = []
 
     for motif2 in motif_dt.keys():
-        for i, idx in enumerate(re.finditer('(?=' + motif2 + ')', fragment[1:])):
+        for i, idx in enumerate(re.finditer('(?=' + motif2 + ')',
+                                fragment[1:])):
             end = idx.start()+1
-            internals = internal_sites(fragment[1:end+len(motif2)-1], motif_dt.keys())
+            internals = internal_sites(fragment[1:end+len(motif2)-1],
+                                       motif_dt.keys())
             frag_ls.append([fragment[:end+len(motif2)],
                             f_start,
                             f_start+end,
@@ -90,6 +93,3 @@ def internal_sites(subseq, all_motifs):
         internals += len(hits)
 
     return internals
-
-
-

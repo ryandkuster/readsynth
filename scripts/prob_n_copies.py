@@ -1,11 +1,7 @@
-import numpy as np
+#!/usr/bin/env python
+
 import os
 import pandas as pd
-import random
-import sys
-
-from functools import partial
-from multiprocessing import Pool
 
 
 def main(digest_file, args):
@@ -18,8 +14,9 @@ def main(digest_file, args):
     # get set of all unique restriction site positions
     df = apply_approach(df, copies_dt)
 
-    prob_file = os.path.join(args.o, 'counts_' + os.path.basename(args.genome) + '.csv')
-    df.drop(df[df['probability'] == 0].index, inplace = True)
+    prob_file = os.path.join(args.o, 'counts_' +
+                             os.path.basename(args.genome) + '.csv')
+    df.drop(df[df['probability'] == 0].index, inplace=True)
     df['adj_prob'] = df['probability'] * args.comp
     df = df.reset_index(drop=True)
     df.to_csv(prob_file, index=None)

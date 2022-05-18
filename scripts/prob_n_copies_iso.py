@@ -1,11 +1,8 @@
+#!/usr/bin/env python
+
 import numpy as np
 import os
 import pandas as pd
-import random
-import sys
-
-from functools import partial
-from multiprocessing import Pool
 
 
 def main(digest_file, args):
@@ -15,7 +12,8 @@ def main(digest_file, args):
     df = find_overlaps(df)
     df = calculate_prob(df)
 
-    prob_file = os.path.join(args.o, 'counts_' + os.path.basename(args.genome) + '.csv')
+    prob_file = os.path.join(args.o, 'counts_' +
+                             os.path.basename(args.genome) + '.csv')
     df['adj_prob'] = df['probability'] * args.comp
     df = df.reset_index(drop=True)
     df.to_csv(prob_file, index=None)
@@ -33,7 +31,7 @@ def find_overlaps(df):
     overlaps = []
 
     for i in np_df:
-        tmp_df = df[(df['start'] > i[1]) & (df['start'] < i[2]) | \
+        tmp_df = df[(df['start'] > i[1]) & (df['start'] < i[2]) |
                     (df['start'] < i[1]) & (df['end'] > i[1])]
         if tmp_df.shape[0] > 0:
             overlaps.append(list(tmp_df.index.values))
@@ -98,7 +96,7 @@ def count_events(linked):
         event = [k]
         try:
             v = linked_dt[k]
-        except:
+        except KeyError:
             events.append(event.copy())
             continue
 

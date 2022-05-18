@@ -1,12 +1,14 @@
+#!/usr/bin/env python
+
 import sys
 
 
 def test_unicode(f):
-    """
+    '''
     attempt to open input file as unicode
     if file fails to be read using readline method, assume .gz
     compression
-    """
+    '''
     try:
         with open(f) as f:
             f.readline()
@@ -26,4 +28,3 @@ if __name__ == '__main__':
         print(f'{f} is gzipped')
     else:
         print(f'{f} is not gzipped')
-
