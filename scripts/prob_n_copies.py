@@ -8,15 +8,16 @@ def main(digest_file, args):
 
     df = pd.read_csv(digest_file)
     internal_max = df['internal'].max()
-
     copies_dt = copies_dict(internal_max, args.cut_prob)
 
-    # get set of all unique restriction site positions
     df = apply_approach(df, copies_dt)
-
     prob_file = os.path.join(args.o, 'counts_' +
                              os.path.basename(args.genome) + '.csv')
     df.drop(df[df['probability'] == 0].index, inplace=True)
+
+    if df.duplicated(subset=['start','end']).any():
+        df = bidirectional_weights(df)
+
     df['adj_prob'] = df['probability'] * args.comp
     df = df.reset_index(drop=True)
     df.to_csv(prob_file, index=None)
@@ -48,6 +49,11 @@ def apply_approach(df, copies_dt):
 def get_copies(copies_dt, internal):
     return copies_dt[internal]
 
+
+def bidirectional_weights(df):
+    df['probability'][df.duplicated(subset=['start','end'], keep=False)] = df['probability']/2
+
+    return df
 
 def get_len_freqs(df, max_len):
     len_freqs = {}

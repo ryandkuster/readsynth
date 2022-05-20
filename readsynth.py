@@ -345,6 +345,7 @@ def process_df(df, digest_file, args):
     # create a column of reverse complement sequences
     df['revc'] = [reverse_comp(i) for i in df['seq'].to_list()]
 
+    # use tmp_df to temporarilty store bidirectional reads
     # duplicate all the reads that work both ways (if RE in m1 and m2)
     tmp_df = df[(df['forward'] == 1) & (df['reverse'] == 1)]
     tmp_df = tmp_df.reset_index(drop=True)
@@ -352,7 +353,7 @@ def process_df(df, digest_file, args):
     # recategorize the bidirectional seqs in df as being forward
     df.loc[(df['forward'] == 1) & (df['reverse'] == 1), 'reverse'] = 0
 
-    # convert remaining reverse strand sequences to the reverse complement
+    # convert unidirectional reverse strand sequences to the reverse complement
     df.loc[df['reverse'] == 1, 'tmp_seq'] = df['revc']
     df.loc[df['reverse'] == 1, 'revc'] = df['seq']
     df.loc[df['reverse'] == 1, 'seq'] = df['tmp_seq']
@@ -609,6 +610,9 @@ if __name__ == '__main__':
     else:
         genomes_df, total_freqs = process_genomes(args, genomes_df)
 
+    if total_freqs['sum_prob'].sum() == 0:
+        sys.exit('no fragments produced, exiting')
+
     save_combined_hist(total_freqs, 'fragment_distributions', 'sum_prob', args)
 
     '''
@@ -631,7 +635,8 @@ if __name__ == '__main__':
     total_freqs['counts'] = \
         round(total_freqs['counts'] * total_freqs['sum_prob'] * adjustment)
 
-    print(total_freqs['counts'].sum())
+    read_no = "{:,}".format(int(total_freqs['counts'].sum()))
+    print(f'\n{read_no} reads simulated\n')
 
     comb_file = os.path.join(args.o, 'combined.csv')
     total_freqs.to_csv(comb_file)

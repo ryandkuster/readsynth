@@ -11,6 +11,8 @@ import scripts.digest_genomes_iso as dgi
 import scripts.prob_n_copies as pnc
 import scripts.prob_n_copies_iso as pnci
 
+from pandas.testing import assert_frame_equal
+
 '''
 usage:
 python3 -m unittest test_readsynth.py
@@ -45,6 +47,42 @@ class Variables():
 
 
 class TestInitFunctions(unittest.TestCase):
+
+#    def test_get_adapters_1(self):
+#        pass
+
+#    def test_get_sbs_start_1(self):
+#        pass
+
+#    def test_open_fastq_1(self):
+#        pass
+
+    def test_check_genomes_1(self):
+        '''
+        given an input df of genome file locations and abundances for
+        each, return df of file locations with abundances identical to
+        the expected file saved as example_metagenome_df.csv
+        '''
+        args = Variables()
+        args.genome = 'test_data/example_metagenome.csv'
+        expected_df = pd.read_csv('test_data/example_metagenome_df.csv')
+        df = rs.check_genomes(args.genome)
+        self.assertTrue(expected_df.equals(df))
+
+    def test_check_genomes_2(self):
+        '''
+        given an input df of genome file locations and abundances for
+        each, return df of file locations with abundances identical to
+        the expected file saved as example_metagenome_df.csv
+        '''
+        args = Variables()
+        args.genome = 'test_project3/metagenome_file.csv'
+        expected_df = pd.read_csv('test_project3/metagenome_file_df.csv')
+        df = rs.check_genomes(args.genome)
+        self.assertTrue(expected_df.equals(df))
+
+
+class TestPalindromicFunctions(unittest.TestCase):
 
     def test_check_for_enzymes_1(self):
         '''
@@ -106,39 +144,87 @@ class TestInitFunctions(unittest.TestCase):
         motif_dt = rs.iupac_motifs(args.m1)
         self.assertEqual(motif_dt, expected)
 
-
-    def test_get_adapters_1(self):
-        pass
-
-    def test_get_sbs_start_1(self):
-        pass
-
-    def test_open_fastq_1(self):
-        pass
-
-    def test_check_genomes_1(self):
-        '''
-        given an input df of genome file locations and abundances for
-        each, return df of file locations with abundances identical to
-        the expected file saved as example_metagenome_df.csv
-        '''
+    def test_dg_digest_seq_1(self):
         args = Variables()
-        args.genome = 'test_data/example_metagenome.csv'
-        expected_df = pd.read_csv('test_data/example_metagenome_df.csv')
-        df = rs.check_genomes(args.genome)
-        self.assertTrue(expected_df.equals(df))
+        seq = 'AAAAAAAAAAGCGCAAAAAAAAAAGCGCAAAAAAAAAA'
+        motif_dt = {'GCGC': 3}
+        expected = [['GCGCAAAAAAAAAAGCGC', 10, 24, 'GCGC', 'GCGC', 0]]
+        seq_ls = dg.digest_seq(0, seq, motif_dt, 200)
+        self.assertEqual(seq_ls, expected)
 
-    def test_check_genomes_2(self):
-        '''
-        given an input df of genome file locations and abundances for
-        each, return df of file locations with abundances identical to
-        the expected file saved as example_metagenome_df.csv
-        '''
+    def test_dg_digest_seq_2(self):
         args = Variables()
-        args.genome = 'test_project3/metagenome_file.csv'
-        expected_df = pd.read_csv('test_project3/metagenome_file_df.csv')
-        df = rs.check_genomes(args.genome)
-        self.assertTrue(expected_df.equals(df))
+        seq = 'AAAAAAAAAAGCGCAAAAAAAAAAGCGCAAAAAAAAAAGCGCAAAAAAAAAA'
+        motif_dt = {'GCGC': 3}
+        expected = [['GCGCAAAAAAAAAAGCGC', 10, 24, 'GCGC', 'GCGC', 0],
+                    ['GCGCAAAAAAAAAAGCGCAAAAAAAAAAGCGC', 10, 38, 'GCGC',
+                     'GCGC', 1],
+                    ['GCGCAAAAAAAAAAGCGC', 24, 38, 'GCGC', 'GCGC', 0],
+                ]
+        seq_ls = dg.digest_seq(0, seq, motif_dt, 200)
+        self.assertCountEqual(seq_ls, expected)
+
+    def test_dg_digest_seq_3(self):
+        args = Variables()
+        seq = 'AAAAAAAAAAGCGCAAAAAAAAAAGCGCAAAAAAAAAAGCGCAAAAAAAAAA'
+        motif_dt = {'GCGC': 3}
+        expected = [['GCGCAAAAAAAAAAGCGC', 10, 24, 'GCGC', 'GCGC', 0],
+                    ['GCGCAAAAAAAAAAGCGC', 24, 38, 'GCGC', 'GCGC', 0],
+                ]
+        seq_ls = dg.digest_seq(0, seq, motif_dt, 20)
+        self.assertCountEqual(seq_ls, expected)
+
+    def test_dg_digest_seq_4(self):
+        args = Variables()
+        seq = 'AAAAAAAAAAGCGCAAAAAAAAAATTAAAAAAAAAAAA'
+        motif_dt = {'GCGC': 3, 'TTAA': 1}
+        expected = [['GCGCAAAAAAAAAATTAA', 10, 24, 'GCGC', 'TTAA', 0]]
+        seq_ls = dg.digest_seq(0, seq, motif_dt, 200)
+        self.assertEqual(seq_ls, expected)
+
+
+    def test_dg_digest_seq_5(self):
+        args = Variables()
+        seq = 'AAAAAAAAAAGCGCAAAAAAAAAATTAAAAAAAAAAAAGCGCAAAAAAAAAA'
+        motif_dt = {'GCGC': 3, 'TTAA': 1}
+        expected = [['GCGCAAAAAAAAAATTAA', 10, 24, 'GCGC', 'TTAA', 0],
+                    ['GCGCAAAAAAAAAATTAAAAAAAAAAAAGCGC', 10, 38, 'GCGC',
+                     'GCGC', 1],
+                    ['TTAAAAAAAAAAAAGCGC', 24, 38, 'TTAA', 'GCGC', 0],
+                ]
+        seq_ls = dg.digest_seq(0, seq, motif_dt, 200)
+        self.assertCountEqual(seq_ls, expected)
+
+#    def test_dg_digest_frag_1(self):
+#        pass
+
+    def test_process_df_1(self):
+        args = Variables()
+        args.motif_dt = {'GCGC': 3}
+        args.motif_dt1 = {'GCGC': 3}
+        args.motif_dt2 = {'GCGC': 3}
+        df = pd.read_csv(
+            'test_data/genomes/pre_process_hhai_hhai_test1.fasta.csv')
+        digest_file = 'test_data/genomes/hhai_hhai_process_df_test.csv'
+        digest_file = rs.process_df(df, digest_file, args)
+        df2 = pd.read_csv(digest_file)
+        expected = pd.read_csv(
+            'test_data/genomes/hhai_hhai_raw_digest_test1.fasta.csv')
+        assert_frame_equal(df2, expected)
+
+    def test_process_df_2(self):
+        args = Variables()
+        args.motif_dt = {'GCGC': 3, 'TTAA': 1}
+        args.motif_dt1 = {'GCGC': 3}
+        args.motif_dt2 = {'TTAA': 1}
+        df = pd.read_csv(
+            'test_data/genomes/pre_process_hhai_msei_test1.fasta.csv')
+        digest_file = 'test_data/genomes/hhai_msei_process_df_test.csv'
+        digest_file = rs.process_df(df, digest_file, args)
+        df2 = pd.read_csv(digest_file)
+        expected = pd.read_csv(
+            'test_data/genomes/hhai_msei_raw_digest_test1.fasta.csv')
+        assert_frame_equal(df2, expected)
 
 
 class TestIsoFunctions(unittest.TestCase):
@@ -272,19 +358,9 @@ class TestIsoFunctions(unittest.TestCase):
 class TestProcessing(unittest.TestCase):
     '''
     smoke tests for simple processing pipeline examples
-
-    tests to perform:
-        identical RE for m1/m2
-        different RE for m1/m2
-        nested RE for m1/m2 (identical)
-        nested RE for m1/m2 (different)
-        iso RE cutter (standard cut regions)
-        iso RE cutter (overlapping cut regions)
     '''
 
 #    def test_process_genomes_1(self):
-#        '''
-#        '''
 #        args = Variables()
 #        args.genome = 'test_project3/metagenome_file.csv'
 #        args.o = 'test_project3'
@@ -297,8 +373,6 @@ class TestProcessing(unittest.TestCase):
 ##        self.assertEqual(args.m1[0], expected)
 
 #    def test_process_genomes_2(self):
-#        '''
-#        '''
 #        args = Variables()
 #        args.genome = 'test_project4/metagenome_file.csv'
 #        args.o = 'test_project4'
@@ -340,9 +414,6 @@ class TestProcessing(unittest.TestCase):
         new = rs.reverse_comp(seq)
         self.assertEqual(new, expected)
 
-
-class TestDigestGenomes(unittest.TestCase):
-
     def test_dg_main_1(self):
         '''
         digest test_project1/fake_genome_1.fasta and confirm number of
@@ -356,7 +427,6 @@ class TestDigestGenomes(unittest.TestCase):
             .index]['internal'].to_list()[0], 3)
 
     def test_dg_main_2(self):
-        pass
         args = Variables()
         args.genome = 'test_project2/fake_genome_2.fasta'
         args.motif_dt = {'TTAA': 1, 'GCGC': 3}
