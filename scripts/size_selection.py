@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 
+import math
 import numpy as np
 import os
 import pandas as pd
@@ -43,7 +44,10 @@ def main(df, args):
     try:
         avg_upper = sum(a)/len(a)
     except ZeroDivisionError:
-        sys.exit('no reads of this length (fragment + adapters)')
+        print(f'no fragments produced in the range of mean {args.mean}bp ' +
+              f'+/- {args.up_bound}bp (adjusted for adapter lengths), quitting')
+        sys.exit()
+
     scale_by = avg_upper/gauss_pdf(args.mean, args.sd, args.up_bound)
     draw_dt = get_draw_dict(args.mean, args.sd, len_dt, scale_by)
     adjustment = args.n / sum(draw_dt.values()) #TODO
@@ -51,6 +55,8 @@ def main(df, args):
 
     for i in range(0, (args.up_bound+(args.up_bound-args.mean))+1):
         fragment_comps[i] = draw_dt[i] / len_dt[i]
+        if math.isnan(fragment_comps[i]):
+            fragment_comps[i] = 0
 
     return fragment_comps, adjustment
 

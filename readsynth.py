@@ -253,10 +253,15 @@ def process_genomes(args, genomes_df):
         print(f'processing genome {os.path.basename(args.genome)}')
         df = digest_genomes.main(args)
         digest_file = process_df(df, digest_file, args)
+
+        if df.shape[0] == 0:
+            digest_ls.append(None)
+            prob_ls.append(None)
+            print(f'no fragments found in {args.genome}\n')
+            continue
+
         prob_file, len_freqs = prob_n_copies.main(digest_file, args)
-
         save_individual_hist(prob_file, args)
-
         digest_ls.append(digest_file)
         prob_ls.append(prob_file)
         tmp_df = pd.DataFrame(len_freqs.items(), columns=['length', 'sum_prob'])
@@ -456,7 +461,7 @@ def save_individual_hist(prob_file, args):
                      binwidth=6,
                      alpha=0.75,
                      color='blue')
-        plt.savefig(os.path.join(args.o, 'hist_' + 
+        plt.savefig(os.path.join(args.o, 'hist_' +
                     os.path.basename(prob_file)[:-4] + '.png'),
                     facecolor='white', transparent=False)
         plt.close()
@@ -598,6 +603,7 @@ if __name__ == '__main__':
     '''
     genomes_df = check_genomes(args.genome)
 
+    print('\n1. simulating enzyme digests\n')
     if args.iso:
         genomes_df, total_freqs = process_genomes_iso(args, genomes_df)
     else:
@@ -610,7 +616,7 @@ if __name__ == '__main__':
     combine relative probabilities of fragments from all input genome digests
     and perform simulation of pooled size selection
     '''
-    print('simulating size selection')
+    print('\n2. simulating size selection\n')
     if args.iso:
         fragment_comps = \
             total_freqs.groupby('length')['sum_prob'].apply(list).to_dict()
@@ -630,8 +636,8 @@ if __name__ == '__main__':
     comb_file = os.path.join(args.o, 'combined.csv')
     total_freqs.to_csv(comb_file)
     save_combined_hist(total_freqs, 'read_distributions', 'counts', args)
-
-    genomes_df = prob_to_counts(comb_file, fragment_comps, adjustment, genomes_df)
+    genomes_df = prob_to_counts(
+        comb_file, fragment_comps, adjustment, genomes_df)
     write_final_file(args, genomes_df)
 
     if args.test:
@@ -641,7 +647,7 @@ if __name__ == '__main__':
     3.
     write fragments to fastq-formatted file with adapters concatenated
     '''
-    print('simulating fastq formatted sequence reads')
+    print('\nsimulating fastq formatted sequence reads')
     write_genomes(comb_file, fragment_comps, adjustment)
 
     #TODO consider chromosome by chromosome approach
