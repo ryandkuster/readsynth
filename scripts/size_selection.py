@@ -54,7 +54,11 @@ def main(df, args):
     fragment_comps = {}
 
     for i in range(0, (args.up_bound+(args.up_bound-args.mean))+1):
-        fragment_comps[i] = draw_dt[i] / len_dt[i]
+        if len_dt[i] == 0 or draw_dt[i] == 0:
+            fragment_comps[i] = 0
+        else:
+            fragment_comps[i] = draw_dt[i] / len_dt[i]
+
         if math.isnan(fragment_comps[i]):
             fragment_comps[i] = 0
 

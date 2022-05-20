@@ -51,7 +51,8 @@ def get_copies(copies_dt, internal):
 
 
 def bidirectional_weights(df):
-    df['probability'][df.duplicated(subset=['start','end'], keep=False)] = df['probability']/2
+    df.loc[(df.duplicated(subset=['start','end'], keep=False)),
+        'probability'] = df['probability']/2
 
     return df
 
