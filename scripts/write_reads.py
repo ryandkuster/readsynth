@@ -54,6 +54,11 @@ def read_writer_samples(df, r1, r2, gen_name, args):
 
 
 def create_seq(i, a1s, a1e, a2s, a2e, args):
+    '''
+    draw random forward and reverse adapters
+    concatenate adapters to current sequence
+    adjust concatenated sequence with Gs if shorter than read length
+    '''
     a1 = random.choice(args.a1)
     a2 = random.choice(args.a2)
     r1_seq = a1[0] + i[0] + a2[1]

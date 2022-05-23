@@ -10,6 +10,7 @@ import scripts.digest_genomes as dg
 import scripts.digest_genomes_iso as dgi
 import scripts.prob_n_copies as pnc
 import scripts.prob_n_copies_iso as pnci
+import scripts.write_reads as wr
 
 from pandas.testing import assert_frame_equal
 
@@ -35,8 +36,41 @@ class Variables():
         self.min = 6
         self.max = 700
         #self.cut_prob
-        #self.a1
-        #self.a2
+
+        top_pref = 'AATGATACGGCGACCACCGAGATCTACAC'
+        top_suf = 'TCGTCGGCAGCGTCAGATGTGTATAAGAGACAG'
+        bot_pref = 'CTGTCTCTTATACACATCTGACGCTGCCGACGA'
+        bot_suf = 'GTGTAGATCTCGGTGGTCGCCGTATCATT'
+        self.a1 = [(top_pref+'TAGATCGC'+top_suf+'TCG',
+                    'A'+bot_pref+'GCGATCTA'+bot_suf,
+                    'For_1_TAGATCGC_HhaI'),
+                   (top_pref+'CTCTCTAT'+top_suf+'TCG',
+                    'A'+bot_pref+'ATAGAGAG'+bot_suf,
+                    'For_2_CTCTCTAT_HhaI'),
+                   (top_pref+'TATCCTCT'+top_suf+'TCG',
+                    'A'+bot_pref+'AGAGGATA'+bot_suf,
+                    'For_3_TATCCTCT_HhaI'),
+                   (top_pref+'AGAGTAGA'+top_suf+'TCG',
+                    'A'+bot_pref+'TCTACTCT'+bot_suf,
+                    'For_4_AGAGTAGA_HhaI')]
+
+        top_pref = 'CAAGCAGAAGACGGCATACGAGAT'
+        top_suf = 'GTCTCGTGGGCTCGGAGATGTGTATAAGAGACAG'
+        bot_pref = 'TACTGTCTCTTATACACATCTCCGAGCCCACGAGAC'
+        bot_suf = 'ATCTCGTATGCCGTCTTCTGCTTG'
+        self.a2 = [(top_pref+'TCGCCTTA'+top_suf,
+                    bot_pref+'TAAGGCGA'+bot_suf,
+                    'Rev_1_TCGCCTTA_MseI'),
+                   (top_pref+'CTAGTACG'+top_suf,
+                    bot_pref+'CGTACTAG'+bot_suf,
+                    'Rev_2_CTAGTACG_MseI'),
+                   (top_pref+'TTCTGCCT'+top_suf,
+                    bot_pref+'AGGCAGAA'+bot_suf,
+                    'Rev_3_TTCTGCCT_MseI'),
+                   (top_pref+'GCTCAGGA'+top_suf,
+                    bot_pref+'TCCTGAGC'+bot_suf,
+                    'Rev_4_GCTCAGGA_MseI')]
+
         #self.a1s
         #self.a2s
         #self.q1
@@ -48,8 +82,12 @@ class Variables():
 
 class TestInitFunctions(unittest.TestCase):
 
-#    def test_get_adapters_1(self):
-#        pass
+    def test_get_adapters_1(self):
+        args = Variables()
+        adapter_file = './test_data/for_hhai.txt'
+        adapters_ls = rs.get_adapters(adapter_file)
+        expected = args.a1
+        self.assertEqual(adapters_ls, expected)
 
 #    def test_get_sbs_start_1(self):
 #        pass
@@ -433,6 +471,38 @@ class TestProcessing(unittest.TestCase):
         df = dg.main(args)
         self.assertEqual(df.iloc[df[(df['start'] == 25) & (df['end'] == 75)]\
             .index]['internal'].to_list()[0], 1)
+
+    def test_wr_create_seq_1(self):
+        args = Variables()
+        i = ['CAAAGCGTTCCAACTACCGTAGGCATCGCCAGAAGCAGT',
+             'TAACTGCTTCTGGCGATGCCTACGGTAGTTGGAACGCTTTGCG', 39, 5]
+
+        args.a1 = [('AAAGCG', 'CTTT', '1_hha')]
+        args.a2 = [('AAAT', 'TAATTT', '1_mse')]
+        a1s = 3
+        a2s = 3
+        args.l = 50
+        a1e = a1s + args.l
+        a2e = a2s + args.l
+        a1, a2, r1_seq, r2_seq, full = wr.create_seq(i, a1s, a1e, a2s, a2e, args)
+        expected_r1 = 'GCGCAAAGCGTTCCAACTACCGTAGGCATCGCCAGAAGCAGTTAATTTGG'
+        self.assertEqual(r1_seq, expected_r1)
+
+    def test_wr_create_seq_2(self):
+        args = Variables()
+        i = ['CAAAGCGTTCCAACTACCGTAGGCATCGCCAGAAGCAGT',
+             'TAACTGCTTCTGGCGATGCCTACGGTAGTTGGAACGCTTTGCG', 39, 5]
+
+        args.a1 = [('AAAGCG', 'CTTT', '1_hha')]
+        args.a2 = [('AAAT', 'TAATTT', '1_mse')]
+        a1s = 3
+        a2s = 3
+        args.l = 10
+        a1e = a1s + args.l
+        a2e = a2s + args.l
+        a1, a2, r1_seq, r2_seq, full = wr.create_seq(i, a1s, a1e, a2s, a2e, args)
+        expected_r1 = 'GCGCAAAGCG'
+        self.assertEqual(r1_seq, expected_r1)
 
 
 if __name__ == "__main__":
