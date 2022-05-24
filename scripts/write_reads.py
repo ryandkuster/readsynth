@@ -15,7 +15,7 @@ def main(df, r1, r2, gen_name, args):
     if not args.a1s:
         args.a1s, args.a2s = 0, 0
 
-    if args.r1 and args.r2:
+    if args.q1 and args.q2:
         read_writer_samples(df, r1, r2, gen_name, args)
     else:
         read_writer_basic(df, r1, r2, gen_name, args)
@@ -27,10 +27,8 @@ def read_writer_samples(df, r1, r2, gen_name, args):
     args.a2s is where to begin in the R2 adapter
     '''
 
-    sampled_q1 = pd.read_csv(args.r1 + '_sampled_scores.csv',
-                             names=['score'], sep='\t')
-    sampled_q2 = pd.read_csv(args.r2 + '_sampled_scores.csv',
-                             names=['score'], sep='\t')
+    sampled_q1 = pd.read_csv(args.q1, names=['score'], sep='\t')
+    sampled_q2 = pd.read_csv(args.q2, names=['score'], sep='\t')
     sampled_q1 = list(sampled_q1['score'].values)
     sampled_q2 = list(sampled_q2['score'].values)
 

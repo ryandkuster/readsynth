@@ -92,9 +92,6 @@ class TestInitFunctions(unittest.TestCase):
 #    def test_get_sbs_start_1(self):
 #        pass
 
-#    def test_open_fastq_1(self):
-#        pass
-
     def test_check_genomes_1(self):
         '''
         given an input df of genome file locations and abundances for

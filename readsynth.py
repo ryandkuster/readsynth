@@ -36,7 +36,7 @@ def parse_user_input():
                         help='space separated list of RE motifs (e.g., AluI or AG/CT, HindIII or A/AGCTT, SmlI or C/TYRAG)')
 
     parser.add_argument('-iso', type=str, required=False,
-                        help='optional type IIC RE motif (e.g., NN/NNNNNNNNNNCGANNNNNNTGCNNNNNNNNNNNN/)')
+                        help='optional type IIB RE motif (e.g., NN/NNNNNNNNNNCGANNNNNNTGCNNNNNNNNNNNN/)')
 
     parser.add_argument('-l', type=int, required=True,
                         help='desired read length of final simulated reads')
@@ -71,14 +71,11 @@ def parse_user_input():
     parser.add_argument('-a2s', type=int, required=False,
                         help='manually provide bp length of adapter a1 before SBS begins')
 
-    parser.add_argument('-r1', type=str, required=False,
-                        help='R1 fastq file to sample Q scores')
+    parser.add_argument('-q1', type=str, required=False,
+                        help='file containing newline-separated R1 Q scores >= length -l')
 
-    parser.add_argument('-r2', type=str, required=False,
-                        help='R2 fastq file to sample Q scores')
-
-    parser.add_argument('-p', type=int, required=False,
-                        help='if using r1/r2 for profile, percent of reads to sample')
+    parser.add_argument('-q2', type=str, required=False,
+                        help='file containing newline-separated R2 Q scores >= length -l')
 
     args = parser.parse_args()
 
@@ -90,14 +87,23 @@ def check_for_enzymes(args):
               'resources/type_iip_enzymes.pickle'), 'rb') as type_iip_file:
         re_dt = pickle.load(type_iip_file)
 
-    #TODO add IIC enzyme pickle here
-
     m1 = [re_dt[i.lower()] if i.lower() in re_dt.keys() else i for i in args.m1]
     m2 = [re_dt[i.lower()] if i.lower() in re_dt.keys() else i for i in args.m2]
 
-    #TODO return re_type here (e.g. "IIC")
-
     return m1, m2
+
+
+def check_for_enzymes_iso(args):
+    with open(os.path.join(os.path.dirname(__file__),
+              'resources/type_iib_enzymes.pickle'), 'rb') as type_iip_file:
+        re_dt = pickle.load(type_iip_file)
+
+    if args.iso.lower() in re_dt.keys():
+        m1 = re_dt[args.iso.lower()]
+    else:
+        m1 = args.iso
+
+    return m1
 
 
 def iupac_motifs(arg_m):
@@ -199,21 +205,6 @@ def get_sbs_start(adapter_ls):
                 return idx-1
 
 
-def open_fastq(fastq, args):
-    print(f'sampling {args.p} percent of scores from {fastq}')
-    perc_keep = [int(args.p)/100, 1-(int(args.p)/100)]
-    i = 0
-
-    with open(fastq) as f, open(fastq + '_sampled_scores.csv', 'w') as out:
-        for line in f:
-            i += 1
-            if i == 4:
-                keep = np.random.choice([True, False], 1, p=perc_keep)
-                if keep:
-                    out.write(line[:args.l] + '\n')
-                i = 0
-
-
 def check_genomes(genome_file):
     '''
     open 'genome_file' abundance profile
@@ -252,7 +243,6 @@ def process_genomes(args, genomes_df):
 
         print(f'processing genome {os.path.basename(args.genome)}')
         df = digest_genomes.main(args)
-        digest_file = process_df(df, digest_file, args)
 
         if df.shape[0] == 0:
             digest_ls.append(None)
@@ -260,6 +250,7 @@ def process_genomes(args, genomes_df):
             print(f'no fragments found in {args.genome}\n')
             continue
 
+        digest_file = process_df(df, digest_file, args)
         prob_file, len_freqs = prob_n_copies.main(digest_file, args)
         save_individual_hist(prob_file, args)
         digest_ls.append(digest_file)
@@ -296,6 +287,13 @@ def process_genomes_iso(args, genomes_df):
 
         print(f'processing genome {os.path.basename(args.genome)}')
         df = digest_genomes_iso.main(args)
+
+        if df.shape[0] == 0:
+            digest_ls.append(None)
+            prob_ls.append(None)
+            print(f'no fragments found in {args.genome}\n')
+            continue
+
         digest_file = process_df_iso(df, digest_file, args)
         prob_file, len_freqs = prob_n_copies_iso.main(digest_file, args)
         digest_ls.append(digest_file)
@@ -543,7 +541,7 @@ def write_genomes(comb_file, fragment_comps, adjustment):
             df = df[['seq', 'revc', 'length', 'counts']]
             write_reads.main(df, r1, r2, gen_name, args)
 
-    if args.r1 and args.r2:
+    if args.q1 and args.q2:
         print('applying error profile')
         command = os.path.join(os.path.dirname(__file__), "src", "apply_error")
         simulate_error(command, sim1, error1)
@@ -569,6 +567,7 @@ if __name__ == '__main__':
         sys.exit('directory not found at ' + os.path.abspath(args.o))
 
     if args.iso:
+        args.iso = check_for_enzymes_iso(args)
         args.motif_dt = iupac_motifs_iso([args.iso])
     else:
         args.motif_dt = {}
@@ -592,11 +591,9 @@ if __name__ == '__main__':
         if not args.a2s:
             args.a2s = get_sbs_start([i[0] for i in args.a2])
 
-    if args.r1 or args.r2:
-        if not args.p:
-            sys.exit('please provide input \"-p\" for percent of fq to sample')
-        open_fastq(args.r1, args)
-        open_fastq(args.r2, args)
+    if args.q1 or args.q2:
+        if not args.q1 or not args.q2:
+            sys.exit('arguments q1 and q2 required')
 
     '''
     1.
