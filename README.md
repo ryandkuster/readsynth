@@ -51,41 +51,26 @@ readsynth.py -genome reference.fasta -m1 G/AATTC -m2 T/TAA -n 10000 -cut_prob 0.
 The above example takes 'reference.fasta' as a **genome** to be digested with EcoRI (**m1**) and MseI (**m2**) in a strand-specific fashion (e.g. the forward adapter ligates with the /AATTC overhang from EcoRI). Assuming 10,000 genomic copies (**n**) of the genome, digest simulation will calculate the expected number of DNA fragments given the enzyme digestion efficiency (**cut_prob**) occurs at a probability of 90% at any random RE motif. The resulting fragments will be size-selected using a normal distribution defined by **mean** and **sd**. Paired-end Illumina reads of length (**l**) will be written to a simulated fastq file (default output has perfect scores).
 
 ## input options
-- genome  - path to file genome
-- o - path to store output
-- m1 - space separated list of RE motifs (e.g., AluI = AG/CT,
-                    HindIII = A/AGCTT, SmlI = C/TYRAG)
-- m2 - space separated list of RE motifs (e.g., AluI = AG/CT,
-                    HindIII = A/AGCTT, SmlI = C/TYRAG)
-- l - desired read length of final simulated reads (defaults
-                    to 250 or given q1/q2 profiles)
-- test - test mode: create newline-separated file of RE digested
-                    sequences only
-- n - genome copy (depth per locus)
-- mean - mean (in bp) of read lengths after size selection
-- sd - standard deviation (in bp) of read lengths after size
-                    selection
-- min - min distance between cuts (optional, defaults to 6bp)
-- max - max fragment length after first cut (optional, defaults
-                    to mean + 6 stdevs)
-- cut_prob - percent probability of per-site cut; use '1' for
-                    complete digestion of fragments (fragments will not
-                    contain internal RE sites)
-- a1 - file containing tab/space-separated adapters and barcode
-                    that attach 5' to read
-- a2 - file containing tab/space-separated adapters and barcode
-                    that attach 3' to read
-- a1s - manually provide bp length of adapter a1 before SBS
-                    begins
-- a2s - manually provide bp length of adapter a1 before SBS
-                    begins
-- q1 - file containing R1 q scores in csv format (see
-                    ngsComposer tool crinoid)
-- q2 - file containing R2 q scores in csv format (see
-                    ngsComposer tool crinoid)
-- r1 - R1 fastq file to sample Q scores
-- r2 - R2 fastq file to sample Q scores
-- p - if using r1/r2 for profile, percent of reads to sample
+```
+- genome             path to file genome
+- o                  path to store output
+- m1                 space separated list of RE motifs (e.g., AluI or AG/CT, HindIII or A/AGCTT, SmlI or C/TYRAG)
+- m2                 space separated list of RE motifs (e.g., AluI or AG/CT, HindIII or A/AGCTT, SmlI or C/TYRAG)
+- iso                optional type IIB RE motif (e.g., NN/NNNNNNNNNNCGANNNNNNTGCNNNNNNNNNNNN/)
+- l                  desired read length of final simulated reads
+- test               test mode: create newline-separated file of RE digested sequences only
+- n                  total read number
+- mean               mean (in bp) of read lengths after size selection
+- up_bound           the upper end of a range (in bp) of read lengths to size select
+- max MAX            max fragment length after first cut (optional, defaults to mean + 6 stdevs)
+- cut_prob           percent probability of per-site cut; use '1' for complete digestion of fragments (fragments will not contain internal RE sites)
+- a1                 file containing tab/space-separated adapters and barcode that attach 5' to read
+- a2                 file containing tab/space-separated adapters and barcode that attach 3' to read
+- a1s                manually provide bp length of adapter a1 before SBS begins
+- a2s                manually provide bp length of adapter a1 before SBS begins
+- q1                 file containing newline-separated R1 Q scores >= length -l
+- q2                 file containing newline-separated R2 Q scores >= length -l
+```
 
 # software overview
 
