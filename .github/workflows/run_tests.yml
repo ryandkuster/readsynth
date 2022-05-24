@@ -17,4 +17,5 @@ jobs:
     - name: Running unit tests
       working-directory: ./test
       run: |
-        python3 -m unittest /test/test_readsynth.py
+        pwd
+        python3 -m unittest test_readsynth.py
