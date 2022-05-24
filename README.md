@@ -5,8 +5,8 @@ Readsynth is a series of python scripts that simulate reduced-representation seq
 
 Readsynth is aimed at standardizing reduced-metagenome sequencing (RMS) libraries, where diverse community members are expected to yield differences in abundance due to molecular sequencing preparation.
 
-![fragment_distribution](resources/images/_fragment_distributions.pdf)
-![fragment_distribution](resources/images/_read_distributions.pdf)
+![fragment_distribution](resources/images/_fragment_distributions.png)
+![fragment_distribution](resources/images/_read_distributions.png)
 
 ## what makes readsynth different?
 The preparation of DNA sequencing libraries include many variables which influence the frequency of a given read, including restriction enzyme site frequency in the sample genome(s), enzyme digestion efficiency, size-selection, as well as PCR bias based on DNA fragment length. Readsynth allows users to control common sources of variability introduced in typical enzymatic library preparations (e.g. RADseq, ddRADseq, GBS, etc.).
