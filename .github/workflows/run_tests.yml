@@ -15,5 +15,6 @@ jobs:
       with:
         python-version: ${{ matrix.python-version }}
     - name: Running unit tests
+      working-directory: ./test
       run: |
-        python3 -m unittest 'test/test_readsynth.py'
+        python3 -m unittest /test/test_readsynth.py
