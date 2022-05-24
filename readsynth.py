@@ -190,21 +190,6 @@ def get_adapters(adapter_file):
     return adapters_ls
 
 
-def get_sbs_start(adapter_ls):
-    """
-    if a1s/a2s not provided, an automated attempt to find the SBS start
-    site is performed by finding the first position where adapters
-    deviate in sequence
-    """
-    if len(adapter_ls) == 1:
-        return len(adapter_ls[0])
-
-    for idx, pos in enumerate(adapter_ls[0]):
-        for seq in adapter_ls:
-            if adapter_ls[0][:idx] not in seq:
-                return idx-1
-
-
 def check_genomes(genome_file):
     '''
     open 'genome_file' abundance profile
@@ -584,12 +569,12 @@ if __name__ == '__main__':
     if args.a1:
         args.a1 = get_adapters(args.a1)
         if not args.a1s:
-            args.a1s = get_sbs_start([i[0] for i in args.a1])
+            args.a1s = len(args.a1[0])
 
     if args.a2:
         args.a2 = get_adapters(args.a2)
         if not args.a2s:
-            args.a2s = get_sbs_start([i[0] for i in args.a2])
+            args.a2s = len(args.a2[0])
 
     if args.q1 or args.q2:
         if not args.q1 or not args.q2:

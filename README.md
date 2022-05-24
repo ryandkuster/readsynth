@@ -5,6 +5,9 @@ Readsynth is a series of python scripts that simulate reduced-representation seq
 
 Readsynth is aimed at standardizing reduced-metagenome sequencing (RMS) libraries, where diverse community members are expected to yield differences in abundance due to molecular sequencing preparation.
 
+![fragment_distribution](resources/images/_fragment_distributions.pdf)
+![fragment_distribution](resources/images/_read_distributions.pdf)
+
 ## what makes readsynth different?
 The preparation of DNA sequencing libraries include many variables which influence the frequency of a given read, including restriction enzyme site frequency in the sample genome(s), enzyme digestion efficiency, size-selection, as well as PCR bias based on DNA fragment length. Readsynth allows users to control common sources of variability introduced in typical enzymatic library preparations (e.g. RADseq, ddRADseq, GBS, etc.).
 
@@ -24,21 +27,6 @@ conda install pandas
 conda install seaborn
 ```
 
-Command line core utilities, specifically 'shuf'. To see if shuf is available on your system, try:
-```
-shuf --help
-```
-
-To install coreutils on macOS:
-```
-brew install coreutils
-```
-
-To install coreutils using the apt package manager:
-```
-sudo apt-get -y install coreutils
-```
-
 ## usage
 
 **inputs**
@@ -46,6 +34,8 @@ sudo apt-get -y install coreutils
 - optional: custom adapter sequences
 - optional: pre-existing fastq data to train error profile
 - see full list of custom settings under 'input options' below
+
+![example_abundance_file](resources/images/abundances.png)
 
 **outputs**
 - csv of **all possible fragments** within a specified maximum length (base pairs)
