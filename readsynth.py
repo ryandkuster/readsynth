@@ -323,7 +323,7 @@ def process_df(df, digest_file, args):
     df = df.reset_index(drop=True)
 
     # convert all redundant IUPAC codes to 'N'
-    df['seq'] = df['seq'].str.replace('[RYSWKMBDHV]', 'N')
+    df['seq'] = df['seq'].str.replace('[RYSWKMBDHV]', 'N', regex=True)
 
     # create a column of reverse complement sequences
     df['revc'] = [reverse_comp(i) for i in df['seq'].to_list()]
@@ -390,7 +390,7 @@ def process_df_iso(df, digest_file, args):
     df['reverse'] = np.where(df['m1'] == list(args.motif_dt.keys())[1], 1, 0)
 
     # convert all redundant IUPAC codes to 'N'
-    df['seq'] = df['seq'].str.replace('[RYSWKMBDHV]', 'N')
+    df['seq'] = df['seq'].str.replace('[RYSWKMBDHV]', 'N', regex=True)
 
     # create a column of reverse complement sequences
     df['revc'] = [reverse_comp(i) for i in df['seq'].to_list()]
