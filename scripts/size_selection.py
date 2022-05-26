@@ -50,6 +50,10 @@ def main(df, args):
 
     scale_by = avg_upper/gauss_pdf(args.mean, args.sd, args.up_bound)
     draw_dt = get_draw_dict(args.mean, args.sd, len_dt, scale_by)
+    if sum(draw_dt.values()) == 0:
+        print(f'no fragments produced in the range of mean {args.mean}bp ' +
+              f'+/- {args.up_bound}bp (adjusted for adapter lengths), quitting')
+        sys.exit()
     adjustment = args.n / sum(draw_dt.values()) #TODO
     fragment_comps = {}
 

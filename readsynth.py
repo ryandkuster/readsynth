@@ -177,6 +177,24 @@ def iupac_motifs_iso(arg_m):
     return motif_dt
 
 
+def get_motif_regex_len(args):
+    motif_len = {}
+    for motif in args.motif_dt.keys():
+        mot_len, count = 0, True
+        for j in motif:
+            if j == '[':
+                count = False
+            elif j == ']':
+                count = True
+                mot_len += 1
+            else:
+                if count is True:
+                    mot_len += 1
+        motif_len[motif] = mot_len
+
+    return motif_len
+
+
 def get_adapters(adapter_file):
     """
     open adapters file and store adapters and barcodes in list of tuples
@@ -566,6 +584,7 @@ if __name__ == '__main__':
         args.motif_dt2 = iupac_motifs(args.m2)
         args.motif_dt.update(args.motif_dt2)
 
+    args.motif_len = get_motif_regex_len(args)
     args.sd = int(round(0.08*args.mean, 0)) # using Sage Science CV of 8%
     args.sd = max(args.sd, int(round((args.up_bound - args.mean)/2, 0)))
     args.max = args.max if args.max else (args.mean + (6*args.sd))
