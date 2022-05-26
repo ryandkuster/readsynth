@@ -43,8 +43,8 @@ def open_fastq(r1_out, r2_out, args):
         opened_r1 = gzip.open(args.r1, 'rt')
         opened_r2 = gzip.open(args.r2, 'rt')
     else:
-        opened_r1 = open(fastq)
-        opened_r2 = open(fastq)
+        opened_r1 = open(args.r1)
+        opened_r2 = open(args.r2)
 
     r1_out = open(r1_out, 'w')
     r2_out = open(r2_out, 'w')
