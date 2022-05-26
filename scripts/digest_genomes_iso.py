@@ -25,7 +25,7 @@ def main(args):
 
     for line in fasta:
         if line.startswith('>') and seq:
-            seq_ls = digest_seq(begin, seq, args.motif_dt, args.max)
+            seq_ls = digest_seq(begin, seq, args)
             gen_ls.extend(seq_ls)
             begin += len(seq)
             seq = ''
@@ -35,7 +35,7 @@ def main(args):
         else:
             seq += line.rstrip().upper()
 
-    seq_ls = digest_seq(begin, seq, args.motif_dt, args.max)
+    seq_ls = digest_seq(begin, seq, args)
     gen_ls.extend(seq_ls)
     begin += len(seq)
     fasta.close()
@@ -46,20 +46,16 @@ def main(args):
     return df
 
 
-def digest_seq(begin, seq, motif_dt, frag_len):
+def digest_seq(begin, seq, args):
     """
     for every chromosome (seq), find all RE recognition positions
-    and preserve frag_len bp ahead as a possible template (fragment)
-
-    each item in seq_ls is [sequence, start, end]
     """
     seq_ls = []
 
-    for motif1 in motif_dt.keys():
-        mot_len = get_query_len(motif1)
+    for motif1 in args.motif_len.keys():
         for idx in re.finditer('(?=' + motif1 + ')', seq):
             start = idx.start()
-            end = start + mot_len
+            end = start + args.motif_len[motif1]
             fragment = seq[start: end]
             seq_ls.append([fragment,
                            begin+start,
@@ -70,17 +66,3 @@ def digest_seq(begin, seq, motif_dt, frag_len):
 
     return seq_ls
 
-
-def get_query_len(query):
-    mot_len, count = 0, True
-    for i in query:
-        if i == '[':
-            count = False
-        elif i == ']':
-            count = True
-            mot_len += 1
-        else:
-            if count is True:
-                mot_len += 1
-
-    return mot_len

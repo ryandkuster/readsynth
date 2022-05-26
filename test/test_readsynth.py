@@ -189,59 +189,84 @@ class TestPalindromicFunctions(unittest.TestCase):
         motif_dt = rs.iupac_motifs(args.m1)
         self.assertEqual(motif_dt, expected)
 
+    def test_get_motif_regex_len_1(self):
+        args = Variables()
+        args.motif_dt = {'C[CT]CG[AG]G': 1}
+        expected = {'C[CT]CG[AG]G': 6}
+        motif_len = rs.get_motif_regex_len(args)
+        self.assertEqual(motif_len, expected)
+
     def test_dg_digest_seq_1(self):
         args = Variables()
         seq = 'AAAAAAAAAAGCGCAAAAAAAAAAGCGCAAAAAAAAAA'
-        motif_dt = {'GCGC': 3}
+        args.motif_len = {'GCGC': 4}
+        args.max = 200
         expected = [['GCGCAAAAAAAAAAGCGC', 10, 24, 'GCGC', 'GCGC', 0]]
-        seq_ls = dg.digest_seq(0, seq, motif_dt, 200)
+        seq_ls = dg.digest_seq(0, seq, args)
         self.assertEqual(seq_ls, expected)
 
     def test_dg_digest_seq_2(self):
         args = Variables()
         seq = 'AAAAAAAAAAGCGCAAAAAAAAAAGCGCAAAAAAAAAAGCGCAAAAAAAAAA'
-        motif_dt = {'GCGC': 3}
+        args.motif_len = {'GCGC': 4}
+        args.max = 200
         expected = [['GCGCAAAAAAAAAAGCGC', 10, 24, 'GCGC', 'GCGC', 0],
                     ['GCGCAAAAAAAAAAGCGCAAAAAAAAAAGCGC', 10, 38, 'GCGC',
                      'GCGC', 1],
                     ['GCGCAAAAAAAAAAGCGC', 24, 38, 'GCGC', 'GCGC', 0],
                 ]
-        seq_ls = dg.digest_seq(0, seq, motif_dt, 200)
+        seq_ls = dg.digest_seq(0, seq, args)
         self.assertCountEqual(seq_ls, expected)
 
     def test_dg_digest_seq_3(self):
         args = Variables()
         seq = 'AAAAAAAAAAGCGCAAAAAAAAAAGCGCAAAAAAAAAAGCGCAAAAAAAAAA'
-        motif_dt = {'GCGC': 3}
+        args.motif_len = {'GCGC': 4}
+        args.max = 20
         expected = [['GCGCAAAAAAAAAAGCGC', 10, 24, 'GCGC', 'GCGC', 0],
                     ['GCGCAAAAAAAAAAGCGC', 24, 38, 'GCGC', 'GCGC', 0],
                 ]
-        seq_ls = dg.digest_seq(0, seq, motif_dt, 20)
+        seq_ls = dg.digest_seq(0, seq, args)
         self.assertCountEqual(seq_ls, expected)
 
     def test_dg_digest_seq_4(self):
         args = Variables()
         seq = 'AAAAAAAAAAGCGCAAAAAAAAAATTAAAAAAAAAAAA'
-        motif_dt = {'GCGC': 3, 'TTAA': 1}
+        args.motif_len = {'GCGC': 4, 'TTAA': 4}
         expected = [['GCGCAAAAAAAAAATTAA', 10, 24, 'GCGC', 'TTAA', 0]]
-        seq_ls = dg.digest_seq(0, seq, motif_dt, 200)
+        seq_ls = dg.digest_seq(0, seq, args)
         self.assertEqual(seq_ls, expected)
 
 
     def test_dg_digest_seq_5(self):
         args = Variables()
         seq = 'AAAAAAAAAAGCGCAAAAAAAAAATTAAAAAAAAAAAAGCGCAAAAAAAAAA'
-        motif_dt = {'GCGC': 3, 'TTAA': 1}
+        args.motif_len = {'GCGC': 4, 'TTAA': 4}
         expected = [['GCGCAAAAAAAAAATTAA', 10, 24, 'GCGC', 'TTAA', 0],
                     ['GCGCAAAAAAAAAATTAAAAAAAAAAAAGCGC', 10, 38, 'GCGC',
                      'GCGC', 1],
                     ['TTAAAAAAAAAAAAGCGC', 24, 38, 'TTAA', 'GCGC', 0],
                 ]
-        seq_ls = dg.digest_seq(0, seq, motif_dt, 200)
+        seq_ls = dg.digest_seq(0, seq, args)
         self.assertCountEqual(seq_ls, expected)
 
-#    def test_dg_digest_frag_1(self):
-#        pass
+    def test_dg_digest_frag_1(self):
+        args = Variables()
+        seq = 'GCGCAAAAAAAAAATTAAAAAAAAAAAAGCGCAAAAAAAAAA'
+        args.motif_len = {'GCGC': 4, 'TTAA': 4}
+        frag_ls = dg.digest_frag(seq, 'GCGC', 10, args)
+        expected = [['GCGCAAAAAAAAAATTAAAAAAAAAAAAGCGC', 10, 38, 'GCGC', 'GCGC', 1],
+                    ['GCGCAAAAAAAAAATTAA', 10, 24, 'GCGC', 'TTAA', 0]]
+        self.assertCountEqual(frag_ls, expected)
+
+    def test_dg_digest_frag_2(self):
+        args = Variables()
+        seq = 'GCGCAAAAAAAAAATTAAAAAAAAAAAAGCGCAAAAAAAAAA'
+        args.motif_len = {'[ACGT]CGC': 4, 'TTAA': 4}
+        frag_ls = dg.digest_frag(seq, '[ACGT]CGC', 10, args)
+        expected = [['GCGCAAAAAAAAAATTAAAAAAAAAAAAGCGC', 10, 38, '[ACGT]CGC', '[ACGT]CGC', 1],
+                    ['GCGCAAAAAAAAAATTAA', 10, 24, '[ACGT]CGC', 'TTAA', 0]]
+        self.assertCountEqual(frag_ls, expected)
 
     def test_process_df_1(self):
         args = Variables()
@@ -297,22 +322,17 @@ class TestIsoFunctions(unittest.TestCase):
     def test_dgi_digest_seq_1(self):
         args = Variables()
         seq = 'A'*22 + 'CGAAAAAAATGC' + 'A'*66
-        motif_dt = {'[ACGT]'*12 + 'CGA' + '[ACGT]'*6 + 'TGC' + '[ACGT]'*12:\
-                    [2, 36],
-                    '[ACGT]'*12 + 'CGA' + '[ACGT]'*6 + 'TGC' + '[ACGT]'*12:\
-                    [0, 34]}
+        args.motif_len = {'[ACGT]'*12 + 'CGA' + '[ACGT]'*6 + 'TGC' + '[ACGT]'*12:\
+                          36,
+                          '[ACGT]'*12 + 'CGA' + '[ACGT]'*6 + 'TGC' + '[ACGT]'*12:\
+                          36}
+        args.max = 200
         expected = [['AAAAAAAAAAAACGAAAAAAATGCAAAAAAAAAAAA', 10, 46,
                      '[ACGT]'*12 + 'CGA' + '[ACGT]'*6 + 'TGC' + '[ACGT]'*12,
                      '[ACGT]'*12 + 'CGA' + '[ACGT]'*6 + 'TGC' + '[ACGT]'*12,
                      0]]
-        seq_ls = dgi.digest_seq(0, seq, motif_dt, 200)
+        seq_ls = dgi.digest_seq(0, seq, args)
         self.assertEqual(seq_ls, expected)
-
-    def test_dgi_get_query_len_1(self):
-        args = Variables()
-        query = '[ACGT]'*12 + 'CGA' + '[ACGT]'*6 + 'TGC' + '[ACGT]'*12
-        mot_len = dgi.get_query_len(query)
-        self.assertEqual(mot_len, 36)
 
     def test_pnci_find_overlaps_1(self):
         args = Variables()
@@ -466,7 +486,7 @@ class TestProcessing(unittest.TestCase):
         '''
         args = Variables()
         args.genome = 'test_project1/fake_genome_1.fasta'
-        args.motif_dt = {'TTAA': 1}
+        args.motif_len = {'TTAA': 4}
         df = dg.main(args)
         self.assertEqual(df.iloc[df[(df['start'] == 25) & (df['end'] == 125)]\
             .index]['internal'].to_list()[0], 3)
@@ -474,7 +494,7 @@ class TestProcessing(unittest.TestCase):
     def test_dg_main_2(self):
         args = Variables()
         args.genome = 'test_project2/fake_genome_2.fasta'
-        args.motif_dt = {'TTAA': 1, 'GCGC': 3}
+        args.motif_len = {'TTAA': 4, 'GCGC': 4}
         df = dg.main(args)
         self.assertEqual(df.iloc[df[(df['start'] == 25) & (df['end'] == 75)]\
             .index]['internal'].to_list()[0], 1)
