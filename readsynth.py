@@ -82,22 +82,22 @@ def parse_user_input():
     return args
 
 
-def check_for_enzymes(args):
+def open_enzyme_file(args):
     with open(os.path.join(os.path.dirname(__file__),
-              'resources/type_iip_enzymes.pickle'), 'rb') as type_iip_file:
+              args.enzyme_file), 'rb') as type_iip_file:
         re_dt = pickle.load(type_iip_file)
 
+    return re_dt
+
+
+def check_for_enzymes(args, re_dt):
     m1 = [re_dt[i.lower()] if i.lower() in re_dt.keys() else i for i in args.m1]
     m2 = [re_dt[i.lower()] if i.lower() in re_dt.keys() else i for i in args.m2]
 
     return m1, m2
 
 
-def check_for_enzymes_iso(args):
-    with open(os.path.join(os.path.dirname(__file__),
-              'resources/type_iib_enzymes.pickle'), 'rb') as type_iip_file:
-        re_dt = pickle.load(type_iip_file)
-
+def check_for_enzymes_iso(args, re_dt):
     if args.iso.lower() in re_dt.keys():
         m1 = re_dt[args.iso.lower()]
     else:
@@ -552,11 +552,15 @@ if __name__ == '__main__':
         sys.exit('directory not found at ' + os.path.abspath(args.o))
 
     if args.iso:
-        args.iso = check_for_enzymes_iso(args)
+        args.enzyme_file = 'resources/type_iib_enzymes.pickle'
+        re_dt = open_enzyme_file(args)
+        args.iso = check_for_enzymes_iso(args, re_dt)
         args.motif_dt = iupac_motifs_iso([args.iso])
     else:
+        args.enzyme_file = 'resources/type_iip_enzymes.pickle'
         args.motif_dt = {}
-        args.m1, args.m2 = check_for_enzymes(args)
+        re_dt = open_enzyme_file(args)
+        args.m1, args.m2 = check_for_enzymes(args, re_dt)
         args.motif_dt1 = iupac_motifs(args.m1)
         args.motif_dt.update(args.motif_dt1)
         args.motif_dt2 = iupac_motifs(args.m2)
@@ -634,9 +638,6 @@ if __name__ == '__main__':
     3.
     write fragments to fastq-formatted file with adapters concatenated
     '''
-    print('\nsimulating fastq formatted sequence reads')
+    print('\n3. simulating fastq formatted sequence reads')
     write_genomes(comb_file, fragment_comps, adjustment)
 
-    #TODO consider chromosome by chromosome approach
-        # this would only temporarily store sequences in the raw digest
-        # raw digests (per chromosome) will be digested and stored as copies

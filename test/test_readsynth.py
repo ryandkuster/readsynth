@@ -89,9 +89,6 @@ class TestInitFunctions(unittest.TestCase):
         expected = args.a1
         self.assertEqual(adapters_ls, expected)
 
-#    def test_get_sbs_start_1(self):
-#        pass
-
     def test_check_genomes_1(self):
         '''
         given an input df of genome file locations and abundances for
@@ -119,6 +116,13 @@ class TestInitFunctions(unittest.TestCase):
 
 class TestPalindromicFunctions(unittest.TestCase):
 
+    def test_open_enzyme_file_1(self):
+        args = Variables()
+        args.m1 = ['AGEI']
+        args.enzyme_file = 'resources/type_iip_enzymes.pickle'
+        re_dt = rs.open_enzyme_file(args)
+        self.assertEqual(len(re_dt), 176)
+
     def test_check_for_enzymes_1(self):
         '''
         open pickled dictionary of enzymes
@@ -126,8 +130,10 @@ class TestPalindromicFunctions(unittest.TestCase):
         '''
         args = Variables()
         args.m1 = ['AGEI']
+        args.enzyme_file = 'resources/type_iip_enzymes.pickle'
+        re_dt = rs.open_enzyme_file(args)
         expected = 'A/CCGGT'
-        args.m1, args.m2 = rs.check_for_enzymes(args)
+        args.m1, args.m2 = rs.check_for_enzymes(args, re_dt)
         self.assertEqual(args.m1[0], expected)
 
     def test_check_for_enzymes_2(self):
@@ -137,8 +143,10 @@ class TestPalindromicFunctions(unittest.TestCase):
         '''
         args = Variables()
         args.m1 = ['agei']
+        args.enzyme_file = 'resources/type_iip_enzymes.pickle'
+        re_dt = rs.open_enzyme_file(args)
         expected = 'A/CCGGT'
-        args.m1, args.m2 = rs.check_for_enzymes(args)
+        args.m1, args.m2 = rs.check_for_enzymes(args, re_dt)
         self.assertEqual(args.m1[0], expected)
 
     def test_check_for_enzymes_3(self):
@@ -148,8 +156,10 @@ class TestPalindromicFunctions(unittest.TestCase):
         '''
         args = Variables()
         args.m1 = ['A/CCGGT']
+        args.enzyme_file = 'resources/type_iip_enzymes.pickle'
+        re_dt = rs.open_enzyme_file(args)
         expected = 'A/CCGGT'
-        args.m1, args.m2 = rs.check_for_enzymes(args)
+        args.m1, args.m2 = rs.check_for_enzymes(args, re_dt)
         self.assertEqual(args.m1[0], expected)
 
     def test_iupac_motifs_1(self):
