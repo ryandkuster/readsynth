@@ -37,27 +37,28 @@ def main(df, args):
         sys.exit('no fragments produced with current settings')
 
     modify_length(df, args)
+    len_dt = length_dict(df, args)
+    high_range = [len_dt[i] for i in range(max(0, args.mean), (args.high+(args.high-args.mean))+1)]
 
-    len_dt = length_dict(df, args.mean, args.sd)
-
-    a = [len_dt[i] for i in range(max(0, args.mean), (args.up_bound+(args.up_bound-args.mean))+1)]
     try:
-        avg_upper = sum(a)/len(a)
+        avg_high = sum(high_range)/len(high_range)
     except ZeroDivisionError:
         print(f'no fragments produced in the range of mean {args.mean}bp ' +
-              f'+/- {args.up_bound}bp (adjusted for adapter lengths), quitting')
+              f'+/- {args.high}bp (adjusted for adapter lengths), quitting')
         sys.exit()
 
-    scale_by = avg_upper/gauss_pdf(args.mean, args.sd, args.up_bound)
-    draw_dt = get_draw_dict(args.mean, args.sd, len_dt, scale_by)
+    scale_by = avg_high / gauss_pdf(args.high, args)
+    draw_dt = get_draw_dict(len_dt, scale_by, args)
+
     if sum(draw_dt.values()) == 0:
         print(f'no fragments produced in the range of mean {args.mean}bp ' +
-              f'+/- {args.up_bound}bp (adjusted for adapter lengths), quitting')
+              f'+/- {args.high}bp (adjusted for adapter lengths), quitting')
         sys.exit()
-    adjustment = args.n / sum(draw_dt.values()) #TODO
+
+    adjustment = args.n / sum(draw_dt.values())
     fragment_comps = {}
 
-    for i in range(0, (args.up_bound+(args.up_bound-args.mean))+1):
+    for i in range(0, args.sd * 6 + 1):
         if len_dt[i] == 0 or draw_dt[i] == 0:
             fragment_comps[i] = 0
         else:
@@ -89,30 +90,31 @@ def modify_length(df, args):
         modifier = 0
 
     args.mean -= modifier
-    args.up_bound -= modifier
+    args.high -= modifier
 
 
-def gauss_pdf(mean, sd, x):
+def gauss_pdf(x, args):
     '''
     return the probability density of x from a normal distribution
     note: the sum of pdf for all points x = 1
     '''
-    pdf = (1/sd*np.sqrt(2*np.pi))*np.exp((-1/2)*((x-mean)/sd)**2)
+    pdf = (1 / args.sd * np.sqrt(2 * np.pi)) * np.exp((-1 / 2) * ((x - args.mean) / args.sd)**2)
+
     return pdf
 
 
-def length_dict(df, mean, sd):
+def length_dict(df, args):
     '''
     create a len_dt, storing the combined probability for each length
     '''
     len_dt = {}
-    for i in range(0, mean + sd*6 + 1):
+    for i in range(0, args.mean + args.sd * 6 + 1):
         len_dt[i] = df[df.length == i]['sum_prob'].sum()
 
     return len_dt
 
 
-def get_draw_dict(mean, sd, len_dt, scale_by):
+def get_draw_dict(len_dt, scale_by, args):
     '''
     create a dictionary of draw numbers in the range 0 to the maximum
     fragment length based on the Gaussian probability density function
@@ -126,10 +128,10 @@ def get_draw_dict(mean, sd, len_dt, scale_by):
     '''
     draw_dt = {}
 
-    for x in range(0, mean + 6*sd + 1):
-        draw_counts = gauss_pdf(mean, sd, x)*scale_by
+    for x in range(0, args.mean + 6*args.sd + 1):
+        draw_counts = gauss_pdf(x, args)*scale_by
         data_counts = len_dt[x]
-        draw_dt[x] = min(draw_counts, data_counts)*0.65 #TODO average recovery
+        draw_dt[x] = min(draw_counts, data_counts) * 0.65 #Sage average recovery
 
     return draw_dt
 

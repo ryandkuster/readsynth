@@ -18,6 +18,39 @@ from pandas.testing import assert_frame_equal
 usage:
 python3 -m unittest test_readsynth.py
 
+remaining tests:
+readsynth.py
+    parse_user_input
+    check_for_enzymes_iso
+    get_gaussian_parameters
+    process_genomes_iso
+    process_df_iso
+    save_individual_hist
+    save_combined_hist
+    prob_to_counts
+    write_final_file
+    write_genomes
+    simulate_error
+digest_genomes.py
+    internal_sites
+gzip_test.py
+    test_unicode
+prob_n_copies.py
+    copies_dict
+    apply_approach
+    get_copies
+    bidirectional_weights
+sample_fastq.py
+    open_fastq
+size_selection.py
+    modify_length
+    gauss_pdf
+    length_dict
+    get_draw_dict
+write_reads.py
+    read_writer_samples
+    even_score_seq
+    read_writer_basic
 '''
 
 
