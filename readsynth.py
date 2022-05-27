@@ -197,7 +197,7 @@ def get_gaussian_parameters(args):
     if args.low == args.high:
         args.sd = int(round(0.08*args.mean, 0)) # using Sage Science CV of 8%
     else:
-        args.sd = int(round(0.5*args.mean, 0)) # using Sage Science CV of 5%
+        args.sd = int(round(0.05*args.mean, 0)) # using Sage Science CV of 5%
 
     return args.mean, args.sd
 
@@ -593,7 +593,7 @@ if __name__ == '__main__':
 
     args.motif_len = get_motif_regex_len(args)
     args.mean, args.sd = get_gaussian_parameters(args)
-    args.max = args.mean + (6*args.sd)
+    args.max = max(args.mean + (6*args.sd), args.high + args.sd)
 
     if args.a1:
         args.a1 = get_adapters(args.a1)

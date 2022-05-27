@@ -38,7 +38,7 @@ def main(df, args):
 
     modify_length(df, args)
     len_dt = length_dict(df, args)
-    high_range = [len_dt[i] for i in range(max(0, args.mean), (args.high+(args.high-args.mean))+1)]
+    high_range = [len_dt[i] for i in range(max(0, args.high-args.sd), (args.high+args.sd)+1)]
 
     try:
         avg_high = sum(high_range)/len(high_range)
@@ -58,7 +58,7 @@ def main(df, args):
     adjustment = args.n / sum(draw_dt.values())
     fragment_comps = {}
 
-    for i in range(0, args.sd * 6 + 1):
+    for i in range(0, args.max + 1):
         if len_dt[i] == 0 or draw_dt[i] == 0:
             fragment_comps[i] = 0
         else:
@@ -108,7 +108,7 @@ def length_dict(df, args):
     create a len_dt, storing the combined probability for each length
     '''
     len_dt = {}
-    for i in range(0, args.mean + args.sd * 6 + 1):
+    for i in range(0, args.max + 1):
         len_dt[i] = df[df.length == i]['sum_prob'].sum()
 
     return len_dt
@@ -128,7 +128,7 @@ def get_draw_dict(len_dt, scale_by, args):
     '''
     draw_dt = {}
 
-    for x in range(0, args.mean + 6*args.sd + 1):
+    for x in range(0, args.max + 1):
         draw_counts = gauss_pdf(x, args)*scale_by
         data_counts = len_dt[x]
         draw_dt[x] = min(draw_counts, data_counts) * 0.65 #Sage average recovery

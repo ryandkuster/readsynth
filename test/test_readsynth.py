@@ -21,8 +21,6 @@ python3 -m unittest test_readsynth.py
 remaining tests:
 readsynth.py
     parse_user_input
-    check_for_enzymes_iso
-    get_gaussian_parameters
     process_genomes_iso
     process_df_iso
     save_individual_hist
@@ -31,8 +29,6 @@ readsynth.py
     write_final_file
     write_genomes
     simulate_error
-digest_genomes.py
-    internal_sites
 gzip_test.py
     test_unicode
 prob_n_copies.py
@@ -229,6 +225,22 @@ class TestPalindromicFunctions(unittest.TestCase):
         motif_len = rs.get_motif_regex_len(args)
         self.assertEqual(motif_len, expected)
 
+    def test_get_gaussian_parameters_1(self):
+        args = Variables()
+        args.low = 100
+        args.high = 200
+        expected = (150, 8)
+        results = rs.get_gaussian_parameters(args)
+        self.assertEqual(results, expected)
+
+    def test_get_gaussian_parameters_2(self):
+        args = Variables()
+        args.low = 200
+        args.high = 200
+        expected = (200, 16)
+        results = rs.get_gaussian_parameters(args)
+        self.assertEqual(results, expected)
+
     def test_dg_digest_seq_1(self):
         args = Variables()
         seq = 'AAAAAAAAAAGCGCAAAAAAAAAAGCGCAAAAAAAAAA'
@@ -301,6 +313,30 @@ class TestPalindromicFunctions(unittest.TestCase):
                     ['GCGCAAAAAAAAAATTAA', 10, 24, '[ACGT]CGC', 'TTAA', 0]]
         self.assertCountEqual(frag_ls, expected)
 
+    def test_internal_sites_1(self):
+        args = Variables()
+        seq = 'GCGCAAAAAAAAAATTAAAAAAAAAAAAGCGC'
+        args.motif_len = {'[ACGT]CGC': 4, 'TTAA': 4}
+        expected = 1
+        internals = dg.internal_sites(seq[1:-1], args.motif_len.keys())
+        self.assertEqual(internals, expected)
+
+    def test_internal_sites_2(self):
+        args = Variables()
+        seq = 'GCGCAAAAAAAAAAAAAAAAAAAAAAGCGC'
+        args.motif_len = {'[ACGT]CGC': 4, 'TTAA': 4}
+        expected = 0
+        internals = dg.internal_sites(seq[1:-1], args.motif_len.keys())
+        self.assertEqual(internals, expected)
+
+    def test_internal_sites_3(self):
+        args = Variables()
+        seq = 'GCGCAAAAGCGCAAAAATTAAAAAAAGCGC'
+        args.motif_len = {'[ACGT]CGC': 4, 'TTAA': 4}
+        expected = 2
+        internals = dg.internal_sites(seq[1:-1], args.motif_len.keys())
+        self.assertEqual(internals, expected)
+
     def test_process_df_1(self):
         args = Variables()
         args.motif_dt = {'GCGC': 3}
@@ -331,6 +367,15 @@ class TestPalindromicFunctions(unittest.TestCase):
 
 
 class TestIsoFunctions(unittest.TestCase):
+
+    def test_check_for_enzymes_iso_1(self):
+        args = Variables()
+        args.m1 = ['BCGI']
+        args.enzyme_file = 'resources/type_iib_enzymes.pickle'
+        expected = 'NN/NNNNNNNNNNCGANNNNNNTGCNNNNNNNNNNNN/'
+        re_dt = rs.open_enzyme_file(args)
+        args.m1, args.m2 = rs.check_for_enzymes(args, re_dt)
+        self.assertEqual(args.m1[0], expected)
 
     def test_iupac_motifs_iso_1(self):
         '''
