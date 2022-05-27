@@ -47,14 +47,11 @@ def parse_user_input():
     parser.add_argument('-n', type=int, required=True,
                         help='total read number')
 
-    parser.add_argument('-mean', type=int, required=True,
-                        help='mean (in bp) of read lengths after size selection')
+    parser.add_argument('-low', type=int, required=True,
+                        help='low range (in bp) of read lengths after size selection')
 
-    parser.add_argument('-up_bound', type=int, required=True,
-                        help='the upper end of a range (in bp) of read lengths to size select')
-
-    parser.add_argument('-max', type=int, required=False,
-                        help='max fragment length after first cut (optional, defaults to mean + 6 stdevs)')
+    parser.add_argument('-high', type=int, required=True,
+                        help='high range (in bp) of read lengths after size selection')
 
     parser.add_argument('-cut_prob', type=float, required=True,
                         help='percent probability of per-site cut; use \'1\' for complete digestion of fragments (fragments will not contain internal RE sites)')
@@ -193,6 +190,16 @@ def get_motif_regex_len(args):
         motif_len[motif] = mot_len
 
     return motif_len
+
+def get_gaussian_parameters(args):
+    args.mean = int(round(args.high + args.low) / 2)
+
+    if args.low == args.high:
+        args.sd = int(round(0.08*args.mean, 0)) # using Sage Science CV of 8%
+    else:
+        args.sd = int(round(0.5*args.mean, 0)) # using Sage Science CV of 5%
+
+    return args.mean, args.sd
 
 
 def get_adapters(adapter_file):
@@ -585,9 +592,8 @@ if __name__ == '__main__':
         args.motif_dt.update(args.motif_dt2)
 
     args.motif_len = get_motif_regex_len(args)
-    args.sd = int(round(0.08*args.mean, 0)) # using Sage Science CV of 8%
-    args.sd = max(args.sd, int(round((args.up_bound - args.mean)/2, 0)))
-    args.max = args.max if args.max else (args.mean + (6*args.sd))
+    args.mean, args.sd = get_gaussian_parameters(args)
+    args.max = args.mean + (6*args.sd)
 
     if args.a1:
         args.a1 = get_adapters(args.a1)
