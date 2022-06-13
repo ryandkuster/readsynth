@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 import argparse
+import json
 import matplotlib.pyplot as plt
 import numpy as np
 import os
@@ -47,14 +48,17 @@ def parse_user_input():
     parser.add_argument('-n', type=int, required=True,
                         help='total read number')
 
-    parser.add_argument('-mean', type=int, required=True,
+    parser.add_argument('-mean', type=int, required='-dist' not in sys.argv,
                         help='mean (in bp) of read lengths after size selection')
 
-    parser.add_argument('-sd', type=int, required=True,
+    parser.add_argument('-sd', type=int, required='-dist' not in sys.argv,
                         help='standard deviation (in bp) of read lengths after size selection')
 
-    parser.add_argument('-x', type=int, required=False,
+    parser.add_argument('-x', type=int, required='-dist' not in sys.argv,
                         help='fragment length where fragment distribution intersects size distribution')
+
+    parser.add_argument('-dist', type=str, required=False,
+                        help='json dictionary of fragment length:count for all expected bp fragments range')
 
     parser.add_argument('-cut_prob', type=float, required=True,
                         help='percent probability of per-site cut; use \'1\' for complete digestion of fragments (fragments will not contain internal RE sites)')
@@ -193,6 +197,14 @@ def get_motif_regex_len(args):
         motif_len[motif] = mot_len
 
     return  motif_len
+
+
+def check_custom_distribution(args):
+    with open(args.dist) as f_o:
+        tmp_dt = json.load(f_o)
+    tmp_dt = {int(k): int(v) for k, v in tmp_dt.items()}
+
+    return max(list(tmp_dt.keys()))
 
 
 def get_adapters(adapter_file):
@@ -483,16 +495,12 @@ def save_individual_hist(prob_file, args):
 
 def save_combined_hist(total_freqs, image_name, weights, args):
     try:
-        plt.axvline(x=args.mean)
-        plt.axvline(x=args.mean-args.sd)
-        plt.axvline(x=args.mean+args.sd)
         ax = sns.histplot(data=total_freqs, x='length', hue='name',
                           weights=total_freqs[weights], multiple="stack",
                           binwidth=6, element="step")
     except IndexError:
         print('singular read lengths, cannot produce histogram')
         return
-
 
     old_legend = ax.legend_
     handles = old_legend.legendHandles
@@ -598,9 +606,13 @@ if __name__ == '__main__':
         args.motif_dt.update(args.motif_dt2)
 
     args.motif_len = get_motif_regex_len(args)
-    args.max = args.mean + (6*args.sd)
-    if not args.x:
-        args.x = args.mean
+
+    if args.dist:
+        args.max = check_custom_distribution(args)
+    else:
+        args.max = args.mean + (6*args.sd)
+        if not args.x:
+            args.x = args.mean
 
     if args.a1:
         args.a1 = get_adapters(args.a1)
