@@ -47,11 +47,14 @@ def parse_user_input():
     parser.add_argument('-n', type=int, required=True,
                         help='total read number')
 
-    parser.add_argument('-low', type=int, required=True,
-                        help='low range (in bp) of read lengths after size selection')
+    parser.add_argument('-mean', type=int, required=True,
+                        help='mean (in bp) of read lengths after size selection')
 
-    parser.add_argument('-high', type=int, required=True,
-                        help='high range (in bp) of read lengths after size selection')
+    parser.add_argument('-sd', type=int, required=True,
+                        help='standard deviation (in bp) of read lengths after size selection')
+
+    parser.add_argument('-x', type=int, required=False,
+                        help='fragment length where fragment distribution intersects size distribution')
 
     parser.add_argument('-cut_prob', type=float, required=True,
                         help='percent probability of per-site cut; use \'1\' for complete digestion of fragments (fragments will not contain internal RE sites)')
@@ -189,17 +192,7 @@ def get_motif_regex_len(args):
                     mot_len += 1
         motif_len[motif] = mot_len
 
-    return motif_len
-
-def get_gaussian_parameters(args):
-    args.mean = int(round(args.high + args.low) / 2)
-
-    if args.low == args.high:
-        args.sd = int(round(0.08*args.mean, 0)) # using Sage Science CV of 8%
-    else:
-        args.sd = int(round(0.05*args.mean, 0)) # using Sage Science CV of 5%
-
-    return args.mean, args.sd
+    return  motif_len
 
 
 def get_adapters(adapter_file):
@@ -245,13 +238,19 @@ def process_genomes(args, genomes_df):
                                         'name',
                                         'counts_file'])
 
+    sys.stdout.write("█%s█" % ("-" * genomes_df.shape[0]))
+    sys.stdout.flush()
+    sys.stdout.write("\b" * (genomes_df.shape[0]+1)) # return to start of line, after '[' 
+
     for idx in range(genomes_df.shape[0]):
         args.genome = genomes_df.iloc[idx]['genome']
         args.comp = genomes_df.iloc[idx]['abundance']
         digest_file = os.path.join(args.o, 'raw_digest_' +
                                    os.path.basename(args.genome) + '.csv')
 
-        print(f'processing genome {os.path.basename(args.genome)}')
+        #print(f'processing genome {os.path.basename(args.genome)}')
+        sys.stdout.write('█')
+        sys.stdout.flush()
         df = digest_genomes.main(args)
 
         if df.shape[0] == 0:
@@ -269,6 +268,8 @@ def process_genomes(args, genomes_df):
         tmp_df['name'] = os.path.basename(args.genome)
         tmp_df['counts_file'] = prob_file
         total_freqs = pd.concat([total_freqs, tmp_df], axis=0)
+
+    sys.stdout.write("█\n")
 
     total_freqs = total_freqs.reset_index(drop=True)
     genomes_df['digest_file'] = digest_ls
@@ -482,12 +483,16 @@ def save_individual_hist(prob_file, args):
 
 def save_combined_hist(total_freqs, image_name, weights, args):
     try:
+        plt.axvline(x=args.mean)
+        plt.axvline(x=args.mean-args.sd)
+        plt.axvline(x=args.mean+args.sd)
         ax = sns.histplot(data=total_freqs, x='length', hue='name',
                           weights=total_freqs[weights], multiple="stack",
                           binwidth=6, element="step")
     except IndexError:
         print('singular read lengths, cannot produce histogram')
         return
+
 
     old_legend = ax.legend_
     handles = old_legend.legendHandles
@@ -496,6 +501,7 @@ def save_combined_hist(total_freqs, image_name, weights, args):
               borderaxespad=0)
     plt.savefig(os.path.join(args.o, f'_{image_name}.pdf'),
                 bbox_inches='tight')
+    plt.close()
 
 
 def prob_to_counts(comb_file, fragment_comps, adjustment, genomes_df):
@@ -592,8 +598,9 @@ if __name__ == '__main__':
         args.motif_dt.update(args.motif_dt2)
 
     args.motif_len = get_motif_regex_len(args)
-    args.mean, args.sd = get_gaussian_parameters(args)
-    args.max = max(args.mean + (6*args.sd), args.high + args.sd)
+    args.max = args.mean + (6*args.sd)
+    if not args.x:
+        args.x = args.mean
 
     if args.a1:
         args.a1 = get_adapters(args.a1)

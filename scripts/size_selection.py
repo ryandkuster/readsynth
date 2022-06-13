@@ -38,21 +38,22 @@ def main(df, args):
 
     modify_length(df, args)
     len_dt = length_dict(df, args)
-    high_range = [len_dt[i] for i in range(max(0, args.high-args.sd), (args.high+args.sd)+1)]
+    x_dist = max(args.x - args.mean, args.x - 0)
+    x_range = [len_dt[i] for i in range(args.x-x_dist, args.x+x_dist+1)]
 
     try:
-        avg_high = sum(high_range)/len(high_range)
+        avg_x = sum(x_range)/len(x_range)
     except ZeroDivisionError:
         print(f'no fragments produced in the range of mean {args.mean}bp ' +
-              f'+/- {args.high}bp (adjusted for adapter lengths), quitting')
+              f'+/- {args.sd}bp (adjusted for adapter lengths), quitting')
         sys.exit()
 
-    scale_by = avg_high / gauss_pdf(args.high, args)
+    scale_by = avg_x / gauss_pdf(args.x, args)
     draw_dt = get_draw_dict(len_dt, scale_by, args)
 
     if sum(draw_dt.values()) == 0:
         print(f'no fragments produced in the range of mean {args.mean}bp ' +
-              f'+/- {args.high}bp (adjusted for adapter lengths), quitting')
+              f'+/- {args.sd}bp (adjusted for adapter lengths), quitting')
         sys.exit()
 
     adjustment = args.n / sum(draw_dt.values())
@@ -90,7 +91,7 @@ def modify_length(df, args):
         modifier = 0
 
     args.mean -= modifier
-    args.high -= modifier
+    args.x -= modifier
 
 
 def gauss_pdf(x, args):

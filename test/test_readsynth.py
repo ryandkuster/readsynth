@@ -225,22 +225,6 @@ class TestPalindromicFunctions(unittest.TestCase):
         motif_len = rs.get_motif_regex_len(args)
         self.assertEqual(motif_len, expected)
 
-    def test_get_gaussian_parameters_1(self):
-        args = Variables()
-        args.low = 100
-        args.high = 200
-        expected = (150, 8)
-        results = rs.get_gaussian_parameters(args)
-        self.assertEqual(results, expected)
-
-    def test_get_gaussian_parameters_2(self):
-        args = Variables()
-        args.low = 200
-        args.high = 200
-        expected = (200, 16)
-        results = rs.get_gaussian_parameters(args)
-        self.assertEqual(results, expected)
-
     def test_dg_digest_seq_1(self):
         args = Variables()
         seq = 'AAAAAAAAAAGCGCAAAAAAAAAAGCGCAAAAAAAAAA'
