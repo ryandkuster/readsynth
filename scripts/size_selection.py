@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 
+import json
 import math
 import numpy as np
 import os
@@ -36,24 +37,17 @@ def main(df, args):
     if len(df) == 0:
         sys.exit('no fragments produced with current settings')
 
-    modify_length(df, args)
     len_dt = length_dict(df, args)
-    x_dist = max(args.x - args.mean, args.x - 0)
-    x_range = [len_dt[i] for i in range(args.x-x_dist, args.x+x_dist+1)]
 
-    try:
-        avg_x = sum(x_range)/len(x_range)
-    except ZeroDivisionError:
-        print(f'no fragments produced in the range of mean {args.mean}bp ' +
-              f'+/- {args.sd}bp (adjusted for adapter lengths), quitting')
-        sys.exit()
-
-    scale_by = avg_x / gauss_pdf(args.x, args)
-    draw_dt = get_draw_dict(len_dt, scale_by, args)
+    if args.dist:
+        fragments_dt = get_custom_dist(len_dt, args)
+        draw_dt = get_custom_draw_dict(fragments_dt, args)
+    else:
+        scale_by = get_scale_gauss(len_dt, args)
+        draw_dt = get_draw_dict(len_dt, scale_by, args)
 
     if sum(draw_dt.values()) == 0:
-        print(f'no fragments produced in the range of mean {args.mean}bp ' +
-              f'+/- {args.sd}bp (adjusted for adapter lengths), quitting')
+        print(f'no fragments produced in the size selection range, quitting')
         sys.exit()
 
     adjustment = args.n / sum(draw_dt.values())
@@ -71,27 +65,56 @@ def main(df, args):
     return fragment_comps, adjustment
 
 
-def modify_length(df, args):
+def length_dict(df, args):
     '''
-    if adapters are present, calculate average length for each
-    sum averages to create a modifier for the fragment length
-    after adapter ligation
-
-    sort and return df with full_length column
+    create a len_dt, storing the combined probability for each length
     '''
-    if args.a1 and args.a2:
-        a1_avg = sum([len(i[0]) for i in args.a1]) / len(args.a1)
-        a2_avg = sum([len(i[1]) for i in args.a2]) / len(args.a2)
-        modifier = round(a1_avg + a2_avg)
-    elif args.a1:
-        a1_avg = sum([len(i[0]) for i in args.a1]) / len(args.a1)
-        a2_avg = sum([len(i[1]) for i in args.a1]) / len(args.a1)
-        modifier = round(a1_avg + a2_avg)
-    else:
-        modifier = 0
+    len_dt = {}
+    for i in range(0, args.max + 1):
+        len_dt[i] = df[df.length == i]['sum_prob'].sum()
 
-    args.mean -= modifier
-    args.x -= modifier
+    return len_dt
+
+
+def get_custom_dist(len_dt, args):
+    with open(args.dist) as f_o:
+        tmp_dt = json.load(f_o)
+
+    tmp_dt = {int(k): int(v) for k, v in tmp_dt.items()}
+    fragments_dt = {}
+
+    for i in len_dt:
+        if i not in tmp_dt:
+            fragments_dt[i] = 0
+        else:
+            fragments_dt[i] = tmp_dt[i]
+
+    return fragments_dt
+
+
+def get_custom_draw_dict(fragments_dt, args):
+    draw_dt = {}
+
+    for x in range(0, args.max + 1):
+        draw_dt[x] = fragments_dt[x]
+
+    return draw_dt
+
+
+def get_scale_gauss(len_dt, args):
+    x_dist = max(args.x - args.mean, args.x - 0)
+    x_range = [len_dt[i] for i in range(args.x-x_dist, args.x+x_dist+1)]
+
+    try:
+        avg_x = sum(x_range)/len(x_range)
+    except ZeroDivisionError:
+        print(f'no fragments produced in the range of mean {args.mean}bp ' +
+              f'+/- {args.sd}bp (adjusted for adapter lengths), quitting')
+        sys.exit()
+
+    scale_by = avg_x / gauss_pdf(args.x, args)
+
+    return scale_by
 
 
 def gauss_pdf(x, args):
@@ -102,17 +125,6 @@ def gauss_pdf(x, args):
     pdf = (1 / args.sd * np.sqrt(2 * np.pi)) * np.exp((-1 / 2) * ((x - args.mean) / args.sd)**2)
 
     return pdf
-
-
-def length_dict(df, args):
-    '''
-    create a len_dt, storing the combined probability for each length
-    '''
-    len_dt = {}
-    for i in range(0, args.max + 1):
-        len_dt[i] = df[df.length == i]['sum_prob'].sum()
-
-    return len_dt
 
 
 def get_draw_dict(len_dt, scale_by, args):
