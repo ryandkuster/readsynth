@@ -8,11 +8,11 @@ def main(digest_file, args):
 
     df = pd.read_csv(digest_file)
     internal_max = df['internal'].max()
-    copies_dt = copies_dict(internal_max, args.cut_prob)
+    copies_dt = copies_dict(internal_max, args)
 
     df = apply_approach(df, copies_dt)
     prob_file = os.path.join(args.o, 'counts_' +
-                             os.path.basename(args.genome) + '.csv')
+                             os.path.basename(args.g) + '.csv')
     df.drop(df[df['probability'] == 0].index, inplace=True)
 
     if df.duplicated(subset=['start','end']).any():
@@ -26,7 +26,7 @@ def main(digest_file, args):
     return prob_file, len_freqs
 
 
-def copies_dict(internal_max, cut_prob):
+def copies_dict(internal_max, args):
     '''
     return a dictionary of expected probabilities for a fragment
     given the fragment contains i internal cut sites
@@ -34,7 +34,7 @@ def copies_dict(internal_max, cut_prob):
     copies_dt = {}
 
     for i in range(internal_max+1):
-        copies_dt[i] = (cut_prob**2) * ((1-cut_prob)**i)
+        copies_dt[i] = (args.c**2) * ((1-args.c)**i)
 
     return copies_dt
 

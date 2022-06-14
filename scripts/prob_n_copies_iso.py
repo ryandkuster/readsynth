@@ -13,7 +13,7 @@ def main(digest_file, args):
     df = calculate_prob(df)
 
     prob_file = os.path.join(args.o, 'counts_' +
-                             os.path.basename(args.genome) + '.csv')
+                             os.path.basename(args.g) + '.csv')
     df['adj_prob'] = df['probability'] * args.comp
     df = df.reset_index(drop=True)
     df.to_csv(prob_file, index=None)

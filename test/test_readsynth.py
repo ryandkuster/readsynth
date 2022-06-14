@@ -17,36 +17,6 @@ from pandas.testing import assert_frame_equal
 '''
 usage:
 python3 -m unittest test_readsynth.py
-
-remaining tests:
-readsynth.py
-    parse_user_input
-    process_genomes_iso
-    process_df_iso
-    save_individual_hist
-    save_combined_hist
-    prob_to_counts
-    write_final_file
-    write_genomes
-    simulate_error
-gzip_test.py
-    test_unicode
-prob_n_copies.py
-    copies_dict
-    apply_approach
-    get_copies
-    bidirectional_weights
-sample_fastq.py
-    open_fastq
-size_selection.py
-    modify_length
-    gauss_pdf
-    length_dict
-    get_draw_dict
-write_reads.py
-    read_writer_samples
-    even_score_seq
-    read_writer_basic
 '''
 
 
@@ -60,11 +30,11 @@ class Variables():
         #self.test
         #self.t
         #self.n
-        self.mean = 400
+        self.u = 400
         self.up_bound = 500
         self.min = 6
         self.max = 700
-        #self.cut_prob
+        #self.c
 
         top_pref = 'AATGATACGGCGACCACCGAGATCTACAC'
         top_suf = 'TCGTCGGCAGCGTCAGATGTGTATAAGAGACAG'
@@ -111,12 +81,47 @@ class Variables():
 
 class TestInitFunctions(unittest.TestCase):
 
+    def test_check_custom_distribution_1(self):
+        args = Variables()
+        expected = 951
+        args.d = './test_data/example_1.json'
+        results = rs.check_custom_distribution(args)
+        self.assertEqual(results, expected)
+
     def test_get_adapters_1(self):
         args = Variables()
         adapter_file = './test_data/for_hhai.txt'
         adapters_ls = rs.get_adapters(adapter_file)
         expected = args.a1
         self.assertEqual(adapters_ls, expected)
+
+    def test_create_adapters_1(self):
+        args = Variables()
+        args.motif_dt1 = {'GCGC': 3}
+        args.motif_dt2 = {'TTAA': 1}
+        a1 = [['AATGATACGGCGACCACCGAGATCTACACTCGTCGGCAGCGTCAGATGTGTATAAGAGACAGGCG',
+               'CCTGTCTCTTATACACATCTGACGCTGCCGACGAGTGTAGATCTCGGTGGTCGCCGTATCATT',
+               'rs1']]
+        a2 = [['CAAGCAGAAGACGGCATACGAGATGTCTCGTGGGCTCGGAGATGTGTATAAGAGACAGT',
+               'TAACTGTCTCTTATACACATCTCCGAGCCCACGAGACATCTCGTATGCCGTCTTCTGCTTG',
+               'rs2']]
+        args.a1, args.a2 = rs.create_adapters(args)
+        self.assertEqual(args.a1, a1)
+        self.assertEqual(args.a2, a2)
+
+    def test_create_adapters_2(self):
+        args = Variables()
+        args.motif_dt1 = {'GAATTC': 1}
+        args.motif_dt2 = {'TTAA': 1}
+        a1 = [['AATGATACGGCGACCACCGAGATCTACACTCGTCGGCAGCGTCAGATGTGTATAAGAGACAGG',
+               'AATTCCTGTCTCTTATACACATCTGACGCTGCCGACGAGTGTAGATCTCGGTGGTCGCCGTATCATT',
+               'rs1']]
+        a2 = [['CAAGCAGAAGACGGCATACGAGATGTCTCGTGGGCTCGGAGATGTGTATAAGAGACAGT',
+               'TAACTGTCTCTTATACACATCTCCGAGCCCACGAGACATCTCGTATGCCGTCTTCTGCTTG',
+               'rs2']]
+        args.a1, args.a2 = rs.create_adapters(args)
+        self.assertEqual(args.a1, a1)
+        self.assertEqual(args.a2, a2)
 
     def test_check_genomes_1(self):
         '''
@@ -125,9 +130,9 @@ class TestInitFunctions(unittest.TestCase):
         the expected file saved as example_metagenome_df.csv
         '''
         args = Variables()
-        args.genome = 'test_data/example_metagenome.csv'
+        args.g = 'test_data/example_metagenome.csv'
         expected_df = pd.read_csv('test_data/example_metagenome_df.csv')
-        df = rs.check_genomes(args.genome)
+        df = rs.check_genomes(args.g)
         self.assertTrue(expected_df.equals(df))
 
     def test_check_genomes_2(self):
@@ -137,9 +142,9 @@ class TestInitFunctions(unittest.TestCase):
         the expected file saved as example_metagenome_df.csv
         '''
         args = Variables()
-        args.genome = 'test_project3/metagenome_file.csv'
+        args.g = 'test_project3/metagenome_file.csv'
         expected_df = pd.read_csv('test_project3/metagenome_file_df.csv')
-        df = rs.check_genomes(args.genome)
+        df = rs.check_genomes(args.g)
         self.assertTrue(expected_df.equals(df))
 
 
@@ -381,6 +386,22 @@ class TestIsoFunctions(unittest.TestCase):
         motif_dt = rs.iupac_motifs_iso(args.iso)
         self.assertEqual(motif_dt, expected)
 
+    def test_create_adapters_iso_1(self):
+        args = Variables()
+        args.motif_dt = {'[ACGT]'*12 + 'CGA' + '[ACGT]'*6 + 'TGC' + '[ACGT]'*12:
+                         [2, 36],
+                         '[ACGT]'*12 + 'GCA' + '[ACGT]'*6 + 'TCG' + '[ACGT]'*12:
+                         [0, 34]}
+        a1 = [['AATGATACGGCGACCACCGAGATCTACACTCGTCGGCAGCGTCAGATGTGTATAAGAGACAGNN',
+               'CTGTCTCTTATACACATCTGACGCTGCCGACGAGTGTAGATCTCGGTGGTCGCCGTATCATT',
+               'rs1']]
+        a2 = [['CAAGCAGAAGACGGCATACGAGATGTCTCGTGGGCTCGGAGATGTGTATAAGAGACAGNN',
+               'CTGTCTCTTATACACATCTCCGAGCCCACGAGACATCTCGTATGCCGTCTTCTGCTTG',
+               'rs2']]
+        args.a1, args.a2 = rs.create_adapters_iso(args)
+        self.assertEqual(args.a1, a1)
+        self.assertEqual(args.a2, a2)
+
     def test_dgi_digest_seq_1(self):
         args = Variables()
         seq = 'A'*22 + 'CGAAAAAAATGC' + 'A'*66
@@ -489,24 +510,24 @@ class TestProcessing(unittest.TestCase):
 
 #    def test_process_genomes_1(self):
 #        args = Variables()
-#        args.genome = 'test_project3/metagenome_file.csv'
+#        args.g = 'test_project3/metagenome_file.csv'
 #        args.o = 'test_project3'
 #        args.motif_dt = {'TTAA': 1, 'GCGC': 3}
 #        args.motif_dt1 = {'TTAA': 1}
 #        args.motif_dt2 = {'GCGC': 3}
-#        args.cut_prob = 1
+#        args.c = 1
 #        genomes_df = pd.read_csv('test_project3/metagenome_file_df.csv')
 #        genomes_df, total_freqs = rs.process_genomes(args, genomes_df)
 ##        self.assertEqual(args.m1[0], expected)
 
 #    def test_process_genomes_2(self):
 #        args = Variables()
-#        args.genome = 'test_project4/metagenome_file.csv'
+#        args.g = 'test_project4/metagenome_file.csv'
 #        args.o = 'test_project4'
 #        args.motif_dt = {'GCGC': 3, 'TTAA': 1}
 #        args.motif_dt1 = {'GCGC': 3}
 #        args.motif_dt2 = {'TTAA': 1}
-#        args.cut_prob = 0.5
+#        args.c = 0.5
 #        genomes_df = pd.read_csv('test_project4/metagenome_file_df.csv')
 #        genomes_df, total_freqs = rs.process_genomes(args, genomes_df)
 #        df = pd.read_csv(
@@ -547,7 +568,7 @@ class TestProcessing(unittest.TestCase):
         internal cut sites behaves as expected
         '''
         args = Variables()
-        args.genome = 'test_project1/fake_genome_1.fasta'
+        args.g = 'test_project1/fake_genome_1.fasta'
         args.motif_len = {'TTAA': 4}
         df = dg.main(args)
         self.assertEqual(df.iloc[df[(df['start'] == 25) & (df['end'] == 125)]\
@@ -555,7 +576,7 @@ class TestProcessing(unittest.TestCase):
 
     def test_dg_main_2(self):
         args = Variables()
-        args.genome = 'test_project2/fake_genome_2.fasta'
+        args.g = 'test_project2/fake_genome_2.fasta'
         args.motif_len = {'TTAA': 4, 'GCGC': 4}
         df = dg.main(args)
         self.assertEqual(df.iloc[df[(df['start'] == 25) & (df['end'] == 75)]\

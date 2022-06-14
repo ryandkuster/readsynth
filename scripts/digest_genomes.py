@@ -11,14 +11,14 @@ def main(args):
     """
     process fasta sequences as restricion enzyme fragments
 
-    input args.genome is fasta
+    input args.g is fasta
 
     output 'raw_digest' file holds all the resulting fragments
     """
-    if test_unicode(args.genome):
-        fasta = gzip.open(args.genome, 'rt')
+    if test_unicode(args.g):
+        fasta = gzip.open(args.g, 'rt')
     else:
-        fasta = open(args.genome)
+        fasta = open(args.g)
 
     begin, gen_ls, seq = 0, [], ''
 

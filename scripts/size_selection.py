@@ -39,7 +39,7 @@ def main(df, args):
 
     len_dt = length_dict(df, args)
 
-    if args.dist:
+    if args.d:
         fragments_dt = get_custom_dist(len_dt, args)
         draw_dt = get_custom_draw_dict(fragments_dt, args)
     else:
@@ -77,7 +77,7 @@ def length_dict(df, args):
 
 
 def get_custom_dist(len_dt, args):
-    with open(args.dist) as f_o:
+    with open(args.d) as f_o:
         tmp_dt = json.load(f_o)
 
     tmp_dt = {int(k): int(v) for k, v in tmp_dt.items()}
@@ -102,14 +102,14 @@ def get_custom_draw_dict(fragments_dt, args):
 
 
 def get_scale_gauss(len_dt, args):
-    x_dist = max(args.x - args.mean, args.x - 0)
+    x_dist = min(args.x - 0, abs(args.max - args.sd), args.max - args.x)
     x_range = [len_dt[i] for i in range(args.x-x_dist, args.x+x_dist+1)]
 
     try:
         avg_x = sum(x_range)/len(x_range)
     except ZeroDivisionError:
-        print(f'no fragments produced in the range of mean {args.mean}bp ' +
-              f'+/- {args.sd}bp (adjusted for adapter lengths), quitting')
+        print(f'no fragments produced in the range of mean {args.u}bp ' +
+              f'+/- {args.sd}bp, quitting')
         sys.exit()
 
     scale_by = avg_x / gauss_pdf(args.x, args)
@@ -122,7 +122,7 @@ def gauss_pdf(x, args):
     return the probability density of x from a normal distribution
     note: the sum of pdf for all points x = 1
     '''
-    pdf = (1 / args.sd * np.sqrt(2 * np.pi)) * np.exp((-1 / 2) * ((x - args.mean) / args.sd)**2)
+    pdf = (1 / args.sd * np.sqrt(2 * np.pi)) * np.exp((-1 / 2) * ((x - args.u) / args.sd)**2)
 
     return pdf
 

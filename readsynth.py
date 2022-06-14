@@ -24,7 +24,7 @@ import scripts.prob_n_copies_iso as prob_n_copies_iso
 def parse_user_input():
     parser = argparse.ArgumentParser(description='simulate RAD libary')
 
-    parser.add_argument('-genome', type=str, required=True,
+    parser.add_argument('-g', type=str, required=True,
                         help='path to file genome')
 
     parser.add_argument('-o', type=str, required=True,
@@ -48,19 +48,19 @@ def parse_user_input():
     parser.add_argument('-n', type=int, required=True,
                         help='total read number')
 
-    parser.add_argument('-mean', type=int, required='-dist' not in sys.argv,
+    parser.add_argument('-u', type=int, required='-d' not in sys.argv,
                         help='mean (in bp) of read lengths after size selection')
 
-    parser.add_argument('-sd', type=int, required='-dist' not in sys.argv,
+    parser.add_argument('-sd', type=int, required='-d' not in sys.argv,
                         help='standard deviation (in bp) of read lengths after size selection')
 
-    parser.add_argument('-x', type=int, required='-dist' not in sys.argv,
+    parser.add_argument('-x', type=int, required=False,
                         help='fragment length where fragment distribution intersects size distribution')
 
-    parser.add_argument('-dist', type=str, required=False,
+    parser.add_argument('-d', type=str, required=False,
                         help='json dictionary of fragment length:count for all expected bp fragments range')
 
-    parser.add_argument('-cut_prob', type=float, required=True,
+    parser.add_argument('-c', type=float, required=False,
                         help='percent probability of per-site cut; use \'1\' for complete digestion of fragments (fragments will not contain internal RE sites)')
 
     parser.add_argument('-a1', type=str, required=False,
@@ -200,7 +200,7 @@ def get_motif_regex_len(args):
 
 
 def check_custom_distribution(args):
-    with open(args.dist) as f_o:
+    with open(args.d) as f_o:
         tmp_dt = json.load(f_o)
     tmp_dt = {int(k): int(v) for k, v in tmp_dt.items()}
 
@@ -218,6 +218,40 @@ def get_adapters(adapter_file):
             adapters_ls.append((a_top, a_bot, a_id))
 
     return adapters_ls
+
+
+def create_adapters(args):
+    a1 = ['AATGATACGGCGACCACCGAGATCTACACTCGTCGGCAGCGTCAGATGTGTATAAGAGACAG',
+          'CTGTCTCTTATACACATCTGACGCTGCCGACGAGTGTAGATCTCGGTGGTCGCCGTATCATT',
+          'rs1']
+    a2 = ['CAAGCAGAAGACGGCATACGAGATGTCTCGTGGGCTCGGAGATGTGTATAAGAGACAG',
+          'CTGTCTCTTATACACATCTCCGAGCCCACGAGACATCTCGTATGCCGTCTTCTGCTTG',
+          'rs2']
+    m1 = list(args.motif_dt1.keys())[0]
+    m2 = list(args.motif_dt2.keys())[0]
+    a1[0] = a1[0] + m1[:args.motif_dt1[m1]]
+    a1[1] = m1[args.motif_dt1[m1]:] + a1[1]
+    a2[0] = a2[0] + m2[:args.motif_dt2[m2]]
+    a2[1] = m2[args.motif_dt2[m2]:] + a2[1]
+
+    return [a1], [a2]
+
+
+def create_adapters_iso(args):
+    a1 = ['AATGATACGGCGACCACCGAGATCTACACTCGTCGGCAGCGTCAGATGTGTATAAGAGACAG',
+          'CTGTCTCTTATACACATCTGACGCTGCCGACGAGTGTAGATCTCGGTGGTCGCCGTATCATT',
+          'rs1']
+    a2 = ['CAAGCAGAAGACGGCATACGAGATGTCTCGTGGGCTCGGAGATGTGTATAAGAGACAG',
+          'CTGTCTCTTATACACATCTCCGAGCCCACGAGACATCTCGTATGCCGTCTTCTGCTTG',
+          'rs2']
+    m1 = list(args.motif_dt.keys())[0]
+    m2 = list(args.motif_dt.keys())[1]
+    a1[0] = a1[0] + 'N' * args.motif_dt[m1][0]
+    a1[1] = 'N' * args.motif_dt[m2][0] + a1[1]
+    a2[0] = a2[0] + 'N' * args.motif_dt[m1][0]
+    a2[1] = 'N' * args.motif_dt[m2][0] + a2[1]
+
+    return [a1], [a2]
 
 
 def check_genomes(genome_file):
@@ -250,25 +284,24 @@ def process_genomes(args, genomes_df):
                                         'name',
                                         'counts_file'])
 
-    sys.stdout.write("█%s█" % ("-" * genomes_df.shape[0]))
+    sys.stdout.write("%s" % ("□" * genomes_df.shape[0]))
     sys.stdout.flush()
     sys.stdout.write("\b" * (genomes_df.shape[0]+1)) # return to start of line, after '[' 
 
     for idx in range(genomes_df.shape[0]):
-        args.genome = genomes_df.iloc[idx]['genome']
+        args.g = genomes_df.iloc[idx]['genome']
         args.comp = genomes_df.iloc[idx]['abundance']
         digest_file = os.path.join(args.o, 'raw_digest_' +
-                                   os.path.basename(args.genome) + '.csv')
+                                   os.path.basename(args.g) + '.csv')
 
-        #print(f'processing genome {os.path.basename(args.genome)}')
-        sys.stdout.write('█')
+        sys.stdout.write('■')
         sys.stdout.flush()
         df = digest_genomes.main(args)
 
         if df.shape[0] == 0:
             digest_ls.append(None)
             prob_ls.append(None)
-            print(f'no fragments found in {args.genome}\n')
+            print(f'no fragments found in {args.g}\n')
             continue
 
         digest_file = process_df(df, digest_file, args)
@@ -277,11 +310,11 @@ def process_genomes(args, genomes_df):
         digest_ls.append(digest_file)
         prob_ls.append(prob_file)
         tmp_df = pd.DataFrame(len_freqs.items(), columns=['length', 'sum_prob'])
-        tmp_df['name'] = os.path.basename(args.genome)
+        tmp_df['name'] = os.path.basename(args.g)
         tmp_df['counts_file'] = prob_file
         total_freqs = pd.concat([total_freqs, tmp_df], axis=0)
 
-    sys.stdout.write("█\n")
+    sys.stdout.write("\n")
 
     total_freqs = total_freqs.reset_index(drop=True)
     genomes_df['digest_file'] = digest_ls
@@ -302,19 +335,24 @@ def process_genomes_iso(args, genomes_df):
     digest_ls, prob_ls = [], []
     total_freqs = pd.DataFrame(columns=['length', 'sum_prob', 'name', 'counts_file'])
 
+    sys.stdout.write("%s" % ("□" * genomes_df.shape[0]))
+    sys.stdout.flush()
+    sys.stdout.write("\b" * (genomes_df.shape[0]+1)) # return to start of line, after '[' 
+
     for idx in range(genomes_df.shape[0]):
-        args.genome = genomes_df.iloc[idx]['genome']
+        args.g = genomes_df.iloc[idx]['genome']
         args.comp = genomes_df.iloc[idx]['abundance']
         digest_file = os.path.join(args.o, 'raw_digest_' +
-                                   os.path.basename(args.genome) + '.csv')
+                                   os.path.basename(args.g) + '.csv')
 
-        print(f'processing genome {os.path.basename(args.genome)}')
+        sys.stdout.write('■')
+        sys.stdout.flush()
         df = digest_genomes_iso.main(args)
 
         if df.shape[0] == 0:
             digest_ls.append(None)
             prob_ls.append(None)
-            print(f'no fragments found in {args.genome}\n')
+            print(f'no fragments found in {args.g}\n')
             continue
 
         digest_file = process_df_iso(df, digest_file, args)
@@ -322,9 +360,11 @@ def process_genomes_iso(args, genomes_df):
         digest_ls.append(digest_file)
         prob_ls.append(prob_file)
         tmp_df = pd.DataFrame(len_freqs.items(), columns=['length', 'sum_prob'])
-        tmp_df['name'] = os.path.basename(args.genome)
+        tmp_df['name'] = os.path.basename(args.g)
         tmp_df['counts_file'] = prob_file
         total_freqs = pd.concat([total_freqs, tmp_df], axis=0)
+
+    sys.stdout.write("\n")
 
     total_freqs = total_freqs.reset_index(drop=True)
     genomes_df['digest_file'] = digest_ls
@@ -607,32 +647,39 @@ if __name__ == '__main__':
 
     args.motif_len = get_motif_regex_len(args)
 
-    if args.dist:
+    if args.d:
         args.max = check_custom_distribution(args)
     else:
-        args.max = args.mean + (6*args.sd)
+        args.max = args.u + (6*args.sd)
         if not args.x:
-            args.x = args.mean
+            args.x = args.u
 
-    if args.a1:
+    if args.a1 and args.a2:
         args.a1 = get_adapters(args.a1)
         if not args.a1s:
             args.a1s = len(args.a1[0])
-
-    if args.a2:
         args.a2 = get_adapters(args.a2)
         if not args.a2s:
             args.a2s = len(args.a2[0])
+    elif args.m1:
+        args.a1, args.a2 = create_adapters(args)
+        args.a1s, args.a2s = 62, 58
+    else:
+        args.a1, args.a2 = create_adapters_iso(args)
+        args.a1s, args.a2s = 62, 58
 
     if args.q1 or args.q2:
         if not args.q1 or not args.q2:
             sys.exit('arguments q1 and q2 required')
 
+    if not args.c:
+        args.c = 1
+
     '''
     1.
     digest genomes one by one, producing raw digest files
     '''
-    genomes_df = check_genomes(args.genome)
+    genomes_df = check_genomes(args.g)
 
     print('\n1. simulating enzyme digests\n')
     if args.iso:
@@ -682,6 +729,6 @@ if __name__ == '__main__':
     3.
     write fragments to fastq-formatted file with adapters concatenated
     '''
-    print('\n3. simulating fastq formatted sequence reads')
+    print('\n3. simulating fastq formatted sequence reads\n')
     write_genomes(comb_file, fragment_comps, adjustment)
 

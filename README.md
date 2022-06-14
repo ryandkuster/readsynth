@@ -1,9 +1,10 @@
 # readsynth
 
 ## what is readsynth?
-Readsynth is a series of python scripts that simulate reduced-representation sequencing libraries with special consideration to DNA fragment abundance. Readsynth takes as input any reference nucleotide sequences (fasta format) along with custom restriction enzyme and adapter information to produce a simulatied set of reads expected in an Illumina-based sequencing reaction.
+Readsynth is a series of python scripts that simulate reduced-representation sequencing libraries with special consideration to DNA fragment abundance. Readsynth takes as input any reference nucleotide sequences in fasta format (i.e. reference genome or genomes) along with custom restriction enzyme and adapter information to simulate the reads expected from an Illumina-based sequencing reaction.
 
 Readsynth is aimed at standardizing reduced-metagenome sequencing (RMS) libraries, where diverse community members are expected to yield differences in abundance due to molecular sequencing preparation.
+
 
 ![fragment_distribution](resources/images/_fragment_distributions.png)
 ![fragment_distribution](resources/images/_read_distributions.png)
@@ -30,7 +31,10 @@ conda install seaborn
 ## usage
 
 **inputs**
-- genome assembly file (fasta) OR csv of locally stored genome files
+- table of locally stored genome assembly files (fasta) and abundance
+- desired total number of reads
+- restriction enzyme motifs and cut efficiency (can use iso-length REs or 16S/ITS primers)
+- size distribution parameters (or locally stored json of custom distribution)
 - optional: custom adapter sequences
 - optional: pre-existing fastq data to train error profile
 - see full list of custom settings under 'input options' below
@@ -46,41 +50,45 @@ conda install seaborn
 
 ## example
 ```
-readsynth.py -genome reference.fasta -m1 G/AATTC -m2 T/TAA -n 10000 -cut_prob 0.90 -mean 300 -sd 100 -l 100 -o /output_directory
+readsynth.py -g abundances.csv -m1 EcoRI -m2 T/TAA -n 1_000_000 -c 0.90 -u 300 -sd 150 -l 100 -o /output_directory
 ```
-The above example takes 'reference.fasta' as a **genome** to be digested with EcoRI (**m1**) and MseI (**m2**) in a strand-specific fashion (e.g. the forward adapter ligates with the /AATTC overhang from EcoRI). Assuming 10,000 genomic copies (**n**) of the genome, digest simulation will calculate the expected number of DNA fragments given the enzyme digestion efficiency (**cut_prob**) occurs at a probability of 90% at any random RE motif. The resulting fragments will be size-selected using a normal distribution defined by **mean** and **sd**. Paired-end Illumina reads of length (**l**) will be written to a simulated fastq file (default output has perfect scores).
+The above example takes 'reference.fasta' as a genome file **g** to be digested with EcoRI (**m1**) and MseI (**m2**) in a strand-specific fashion (e.g. the forward adapter ligates with the /AATTC overhang from EcoRI). Assuming a desired output of 1 million reads (**n**) in total, digest simulation will calculate the expected number of DNA fragments given the enzyme digestion cut efficiency (**c**) occurs at a probability of 90% at any random RE motif. The resulting fragments will be size-selected using a normal distribution defined by **u** and **sd**. Paired-end Illumina reads of length (**l**) 150bp will be written to a simulated fastq file (default output has perfect scores).
 
 ## input options
 ```
-- genome             path to file genome
-- o                  path to store output
-- m1                 space separated list of RE motifs (e.g., AluI or AG/CT, HindIII or A/AGCTT, SmlI or C/TYRAG)
-- m2                 space separated list of RE motifs (e.g., AluI or AG/CT, HindIII or A/AGCTT, SmlI or C/TYRAG)
-- iso                optional type IIB RE motif (e.g., NN/NNNNNNNNNNCGANNNNNNTGCNNNNNNNNNNNN/)
-- l                  desired read length of final simulated reads
-- test               test mode: create newline-separated file of RE digested sequences only
-- n                  total read number
-- mean               mean (in bp) of read lengths after size selection
-- up_bound           the upper end of a range (in bp) of read lengths to size select
-- max MAX            max fragment length after first cut (optional, defaults to mean + 6 stdevs)
-- cut_prob           percent probability of per-site cut; use '1' for complete digestion of fragments (fragments will not contain internal RE sites)
-- a1                 file containing tab/space-separated adapters and barcode that attach 5' to read
-- a2                 file containing tab/space-separated adapters and barcode that attach 3' to read
-- a1s                manually provide bp length of adapter a1 before SBS begins
-- a2s                manually provide bp length of adapter a1 before SBS begins
-- q1                 file containing newline-separated R1 Q scores >= length -l
-- q2                 file containing newline-separated R2 Q scores >= length -l
+  -h, --help       show this help message and exit
+  -g G             path to file genome
+  -o O             path to store output
+  -m1 M1 [M1 ...]  space separated list of RE motifs (e.g., AluI or AG/CT, HindIII or A/AGCTT, SmlI or C/TYRAG)
+  -m2 M2 [M2 ...]  space separated list of RE motifs (e.g., AluI or AG/CT, HindIII or A/AGCTT, SmlI or C/TYRAG)
+  -iso ISO         optional type IIB RE motif (e.g., NN/NNNNNNNNNNCGANNNNNNTGCNNNNNNNNNNNN/)
+  -l L             desired read length of final simulated reads
+  -test            test mode: create newline-separated file of RE digested sequences only
+  -n N             total read number
+  -u U             mean (in bp) of read lengths after size selection
+  -sd SD           standard deviation (in bp) of read lengths after size selection
+  -x X             fragment length where fragment distribution intersects size distribution
+  -d D             json dictionary of fragment length:count for all expected bp fragments range
+  -c C             percent probability of per-site cut; use '1' for complete digestion of fragments (fragments will not contain internal RE sites)
+  -a1 A1           file containing tab/space-separated adapters and barcode that attach 5' to read
+  -a2 A2           file containing tab/space-separated adapters and barcode that attach 3' to read
+  -a1s A1S         manually provide bp length of adapter a1 before SBS begins
+  -a2s A2S         manually provide bp length of adapter a1 before SBS begins
+  -q1 Q1           file containing newline-separated R1 Q scores >= length -l
+  -q2 Q2           file containing newline-separated R2 Q scores >= length -l
 ```
 
 # software overview
 
 ```
 --readsynth.py
- |||
- || `_ 1. digest_genomes.py  -  store seq and pos of possible RE fragments
- | `__ 2. n_copies.py        -  partially digest genome with n copies
-  `___ 3. size_selection.py  -  size select reads from Gaussian distribution
+|| |
+|| |`_ 1a. digest_genomes.py -  store seq and pos of possible RE fragments
+|| `__ 1b. prob_n_copies.py  -  partially digest genome with n copies
+| `___ 2.  size_selection.py  -  size select reads from defined distribution
+ `____ 3.  write_reads.py     -  write fragments as paired end fastq-formatted reads
 ```
+
 ## 1. digest_genomes.py  
 Given a fastq sequence, digest_genomes.py performs a regex search for all m1/m2 restriction motifs. Once a motif hit occurs, the sequence is searched forward within a set range (**max**, default is mean + 6sd). The start and end position as well as the orientation of the motifs is saved, and sequences are reverse-complemented when oriented on the reverse direction of the reference sequence. Only fragments that contain the m1 motif(s) at the 5' end and the m2 motif(s) at the 3' end will be kept.
 
@@ -112,31 +120,10 @@ possible fragments:
                                                  TAAAGATCGCCATAATATTATTG
                                                    TTCTAGCGGTATTATAATAACTTAA
 ```
-The resulting fragments are saved in the output directory as a csv-formatted 'raw_digest' file with the following information:
+The resulting fragments are saved in the output directory as a csv-formatted 'raw_digest' file.
 
-
-|seq|start|end|m1|m2|length|reverse|
-|:- |:-   |:- |:-|:-|:-    |:-     |
-|AATTCGTTGAAAATCCGGTCCTGACGGGACTTT|4|37|GAATTC|TTAA|37|0|
-|AATTCGTTGAAAATCCGGTCCTGACGGGACTTTTAACAAGGAAT|4|48|GAATTC|TTAA|48|0|
-|AATTCAATAATATTATGGCGATCTTTAATTCCTTGT|37|71|TTAA|GAATTC|40|1|
-|AATTCAATAATATTATGGCGATCTT|48|71|TTAA|GAATTC|29|1|
-
-Above, 'length' reflects the overhang-to-overhang distance and the sequences ('seq') are represented with the overhangs cleaved in the 5' to 3' orientation.
-
-## 2. n_copies.py
-Once the raw digest fragments have been determined, n_copies.py uses the per-site probability of enzyme cleaving (**cut_prob**) to simulate digesting **n** copy numbers of the input genome. This model captures the non-uniform distribution of fragments where fragments containing intervening cut sites will be less abundant.
-
-Below is a sample output of our toy example using cut_prob = 90% and n = 10,000 genome copies:
-
-|seq|start|end|m1|m2|length|reverse|copies|
-|:- |:-   |:- |:-|:-|:-    |:-     |:-    |
-|AATTCGTTGAAAATCCGGTCCTGACGGGACTTT|4|37|GAATTC|TTAA|37|0|8062|
-|AATTCGTTGAAAATCCGGTCCTGACGGGACTTTTAACAAGGAAT|4|48|GAATTC|TTAA|48|0|805|
-|AATTCAATAATATTATGGCGATCTTTAATTCCTTGT|37|71|TTAA|GAATTC|40|1|794|
-|AATTCAATAATATTATGGCGATCTT|48|71|TTAA|GAATTC|29|1|8132|
-
-Notice the second and third sequences are less abundant as they are mutually exclusive within a single genome (e.g. if cut_prob = 100%, only those fragments with no internal enzyme motifs will be produced in simulation).
+## 2. prob_n_copies.py
+Once the raw digest fragments have been determined, prob_n_copies.py uses the per-site probability of enzyme cleaving (**c**) to simulate digesting **n** copy numbers of the input genome. This model captures the non-uniform distribution of fragments where fragments containing intervening cut sites will be less abundant.
 
 ## 3. size_selection.py
 Now that we have a baseline number of fragments expected from n number of genome copies with a given digestion efficiency, we use the **mean** and **sd** arguments to draw fragments from a Normal distribution. The area under the distribution (number of reads) is grown until reads in the range of mean through mean + 2sd are not under-represented in the sampling process.
@@ -150,4 +137,5 @@ In each sequence header, the following components may be useful for a number of 
 
 |@|62|47|138|34|CGAAGGTGAT|TGCCAAT|full_genome.fna|1|
 |:-|:-|:-|:-|:-|:---------|:------|:-------------|:-|
-|'@'|fastq index|index of 'sampled_df.csv'|length of fragment with adapters|length of fragment|R1 barcode|R2 barcode|fasta name|r1/r2 read|
+|'@'|fastq index|index of counts file|length of fragment with adapters|length of fragment|p5 adapter id|p7 adapter id|fasta name|r1/r2 read|
+
