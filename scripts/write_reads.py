@@ -35,9 +35,9 @@ def read_writer_samples(df, r1, r2, gen_name, args):
     df = np.array(df)
     r_no = 0
     a1s = args.a1s
-    a1e = args.a1s + args.l
+    a1e = args.a1s + args.l1
     a2s = args.a2s
-    a2e = args.a2s + args.l
+    a2e = args.a2s + args.l2
 
     for idx, i in enumerate(df):
         for j in range(i[3]):
@@ -62,8 +62,8 @@ def create_seq(i, a1s, a1e, a2s, a2e, args):
     r1_seq = a1[0] + i[0] + a2[1]
     r2_seq = a2[0] + i[1] + a1[1]
     full = len(r1_seq)
-    r1_seq = r1_seq[a1s:a1e].ljust(args.l, 'G')
-    r2_seq = r2_seq[a2s:a2e].ljust(args.l, 'G')
+    r1_seq = r1_seq[a1s:a1e].ljust(args.l1, args.e)
+    r2_seq = r2_seq[a2s:a2e].ljust(args.l2, args.e)
 
     return a1, a2, r1_seq, r2_seq, full
 
@@ -84,11 +84,12 @@ def read_writer_basic(df, r1, r2, gen_name, args):
     '''
     df = np.array(df)
     r_no = 0
-    score = 'I' * args.l
+    score1 = 'I' * args.l1
+    score2 = 'I' * args.l2
     a1s = args.a1s
-    a1e = args.a1s + args.l
+    a1e = args.a1s + args.l1
     a2s = args.a2s
-    a2e = args.a2s + args.l
+    a2e = args.a2s + args.l2
 
     for idx, i in enumerate(df):
         for j in range(i[3]):

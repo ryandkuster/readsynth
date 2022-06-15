@@ -39,8 +39,11 @@ def parse_user_input():
     parser.add_argument('-iso', type=str, required=False,
                         help='optional type IIB RE motif (e.g., NN/NNNNNNNNNNCGANNNNNNTGCNNNNNNNNNNNN/)')
 
-    parser.add_argument('-l', type=int, required=True,
-                        help='desired read length of final simulated reads')
+    parser.add_argument('-l1', type=int, required=True,
+                        help='desired R1 read length of final simulated reads')
+
+    parser.add_argument('-l2', type=int, required=True,
+                        help='desired R2 read length of final simulated reads')
 
     parser.add_argument('-test', dest='test', action='store_true',
                         help='test mode: create newline-separated file of RE digested sequences only')
@@ -80,6 +83,9 @@ def parse_user_input():
 
     parser.add_argument('-q2', type=str, required=False,
                         help='file containing newline-separated R2 Q scores >= length -l')
+
+    parser.add_argument('-e', type=str, required=False,
+                        help='optional: filler base to use if full adapter contaminaton occurs')
 
     args = parser.parse_args()
 
@@ -294,8 +300,6 @@ def process_genomes(args, genomes_df):
         digest_file = os.path.join(args.o, 'raw_digest_' +
                                    os.path.basename(args.g) + '.csv')
 
-        sys.stdout.write('■')
-        sys.stdout.flush()
         df = digest_genomes.main(args)
 
         if df.shape[0] == 0:
@@ -313,6 +317,9 @@ def process_genomes(args, genomes_df):
         tmp_df['name'] = os.path.basename(args.g)
         tmp_df['counts_file'] = prob_file
         total_freqs = pd.concat([total_freqs, tmp_df], axis=0)
+
+        sys.stdout.write('■')
+        sys.stdout.flush()
 
     sys.stdout.write("\n")
 
@@ -345,8 +352,6 @@ def process_genomes_iso(args, genomes_df):
         digest_file = os.path.join(args.o, 'raw_digest_' +
                                    os.path.basename(args.g) + '.csv')
 
-        sys.stdout.write('■')
-        sys.stdout.flush()
         df = digest_genomes_iso.main(args)
 
         if df.shape[0] == 0:
@@ -363,6 +368,9 @@ def process_genomes_iso(args, genomes_df):
         tmp_df['name'] = os.path.basename(args.g)
         tmp_df['counts_file'] = prob_file
         total_freqs = pd.concat([total_freqs, tmp_df], axis=0)
+
+        sys.stdout.write('■')
+        sys.stdout.flush()
 
     sys.stdout.write("\n")
 
@@ -674,6 +682,11 @@ if __name__ == '__main__':
 
     if not args.c:
         args.c = 1
+
+    if args.e:
+        args.e = args.e[0]
+    else:
+        args.e = 'G'
 
     '''
     1.

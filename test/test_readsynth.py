@@ -591,9 +591,11 @@ class TestProcessing(unittest.TestCase):
         args.a2 = [('AAAT', 'TAATTT', '1_mse')]
         a1s = 3
         a2s = 3
-        args.l = 50
-        a1e = a1s + args.l
-        a2e = a2s + args.l
+        args.e = 'G'
+        args.l1 = 50
+        args.l2 = 50
+        a1e = a1s + args.l1
+        a2e = a2s + args.l2
         a1, a2, r1_seq, r2_seq, full = wr.create_seq(i, a1s, a1e, a2s, a2e, args)
         expected_r1 = 'GCGCAAAGCGTTCCAACTACCGTAGGCATCGCCAGAAGCAGTTAATTTGG'
         self.assertEqual(r1_seq, expected_r1)
@@ -607,9 +609,11 @@ class TestProcessing(unittest.TestCase):
         args.a2 = [('AAAT', 'TAATTT', '1_mse')]
         a1s = 3
         a2s = 3
-        args.l = 10
-        a1e = a1s + args.l
-        a2e = a2s + args.l
+        args.e = 'G'
+        args.l1 = 10
+        args.l2 = 10
+        a1e = a1s + args.l1
+        a2e = a2s + args.l2
         a1, a2, r1_seq, r2_seq, full = wr.create_seq(i, a1s, a1e, a2s, a2e, args)
         expected_r1 = 'GCGCAAAGCG'
         self.assertEqual(r1_seq, expected_r1)
