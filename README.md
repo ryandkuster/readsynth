@@ -13,6 +13,11 @@ Readsynth is aimed at standardizing reduced-metagenome sequencing (RMS) librarie
 The preparation of DNA sequencing libraries include many variables which influence the frequency of a given read, including restriction enzyme site frequency in the sample genome(s), enzyme digestion efficiency, size-selection, as well as PCR bias based on DNA fragment length. Readsynth allows users to control common sources of variability introduced in typical enzymatic library preparations (e.g. RADseq, ddRADseq, GBS, etc.).
 
 ## requirements
+To begin using readsynth for the first time, change to the src directory and run:
+```
+make apply_error
+'''
+
 Python packages numpy, pandas, and seaborn
 To install using pip:
 ```

@@ -5,6 +5,7 @@
 /.vscode/*
 /.ipynb_checkpoints/*
 /.idea/*
+/src/apply_error
 __pycache__/
 .DS_Store
 *fastq
