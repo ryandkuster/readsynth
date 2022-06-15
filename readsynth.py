@@ -305,7 +305,7 @@ def process_genomes(args, genomes_df):
         if df.shape[0] == 0:
             digest_ls.append(None)
             prob_ls.append(None)
-            print(f'no fragments found in {args.g}\n')
+            sys.stdout.write('◌')
             continue
 
         digest_file = process_df(df, digest_file, args)
@@ -357,7 +357,7 @@ def process_genomes_iso(args, genomes_df):
         if df.shape[0] == 0:
             digest_ls.append(None)
             prob_ls.append(None)
-            print(f'no fragments found in {args.g}\n')
+            sys.stdout.write('◌')
             continue
 
         digest_file = process_df_iso(df, digest_file, args)

@@ -1,10 +1,11 @@
+#include <algorithm>
+#include <cassert>
 #include <fstream>
 #include <iostream>
-#include <string>
 #include <math.h>
-#include <vector>
 #include <stdlib.h>
-#include <algorithm>
+#include <string>
+#include <vector>
 
 
 char mutate_base (char base) {
