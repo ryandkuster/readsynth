@@ -96,6 +96,6 @@ def read_writer_basic(df, r1, r2, gen_name, args):
             a1, a2, r1_seq, r2_seq, full = \
                 create_seq(i, a1s, a1e, a2s, a2e, args)
             header = f'@{r_no}:{idx}:{full}:{i[2]}:{a1[2]}:{a2[2]}:{gen_name}'
-            r1.write(f'{header} 1\n{r1_seq}\n+\n{score}\n')
-            r2.write(f'{header} 2\n{r2_seq}\n+\n{score}\n')
+            r1.write(f'{header} 1\n{r1_seq}\n+\n{score1}\n')
+            r2.write(f'{header} 2\n{r2_seq}\n+\n{score2}\n')
             r_no += 1
