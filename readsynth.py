@@ -492,12 +492,9 @@ def process_df_iso(df, digest_file, args):
     m1 = list(args.motif_dt.keys())[0]
     m1_f = args.motif_dt[m1][0]
     m1_b = args.motif_dt[m1][1]
-    m2 = list(args.motif_dt.keys())[1]
-    m2_f = args.motif_dt[m2][0]
-    m2_b = args.motif_dt[m2][1]
 
     df['seq'] = df['seq'].str[m1_f:m1_b]
-    df['revc'] = df['revc'].str[m2_f:m2_b]
+    df['revc'] = df['revc'].str[m1_f:m1_b]
 
     df['length'] = df['seq'].str.len()
     df = df.sort_values(by=['start'])
@@ -621,11 +618,14 @@ def write_genomes(comb_file, fragment_comps, adjustment):
 
 
 def simulate_error(command, sim_in, error_out):
-    process = subprocess.Popen([command, sim_in, error_out], shell=False)
-    out, err = process.communicate()
-    errcode = process.returncode
-    process.kill()
-    process.terminate()
+    try:
+        process = subprocess.Popen([command, sim_in, error_out], shell=False)
+        out, err = process.communicate()
+        errcode = process.returncode
+        process.kill()
+        process.terminate()
+    except FileNotFoundError:
+        sys.exit('please run \'make apply_error\' in the src directory of readsynth')
 
 
 if __name__ == '__main__':
