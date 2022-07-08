@@ -53,11 +53,23 @@ conda install seaborn
 - optional: simulated fastq file of expected reads
 
 
-## example
+## example ddRADseq library creation
 ```
-readsynth.py -g abundances.csv -m1 EcoRI -m2 T/TAA -n 1_000_000 -c 0.90 -u 300 -sd 150 -l 100 -o /output_directory
+readsynth.py -g abundances.csv -m1 EcoRI -m2 T/TAA -n 1_000_000 -c 0.90 -u 300 -sd 100 -l 150 -o /output_directory
 ```
-The above example takes 'reference.fasta' as a genome file **g** to be digested with EcoRI (**m1**) and MseI (**m2**) in a strand-specific fashion (e.g. the forward adapter ligates with the /AATTC overhang from EcoRI). Assuming a desired output of 1 million reads (**n**) in total, digest simulation will calculate the expected number of DNA fragments given the enzyme digestion cut efficiency (**c**) occurs at a probability of 90% at any random RE motif. The resulting fragments will be size-selected using a normal distribution defined by **u** and **sd**. Paired-end Illumina reads of length (**l**) 150bp will be written to a simulated fastq file (default output has perfect scores).
+The above example takes 'abundances.csv' as a genome abundance file **g** with all reference fasta files to be digested with EcoRI (**m1**) and MseI (**m2**) in a strand-specific fashion (e.g. the forward adapter always ligates with the /AATTC overhang from EcoRI). Assuming a desired output of 1 million reads (**n**) in total, digest simulation will calculate the expected number of DNA fragments given the enzyme digestion cut efficiency (**c**) occurs at a probability of 90% at any random RE motif. The resulting fragments will be size-selected using a normal distribution defined by **u** and **sd**. Paired-end Illumina reads of length (**l**) 150bp will be written to a simulated fastq file (default output has perfect scores).
+
+## example 16S library creation
+```
+readsynth.py -g abundances.csv   -m1 /CCTACGGGNGGCWGCAG /CTGCWGCCNCCCGTAGG -m2 /GACTACHVGGGTATCTAANCC /GGNTTAGATACCCBDGTAGTC -n 1_000_000 -free -l 150 -o /output_directory
+```
+The above example differs from the ddRADseq library creation in that in place of a single, palindromic restriction motif for -m1, we now provide the forward V3-V4 primer along with its reverse complement. Further, this library avoids applying a gaussian size selection step and utilizes the **free** argument to go distribution-free.
+
+## example isolength library creation
+```
+readsynth.py -g abundances.csv -iso BcgI -n 1_000_000 -l 150 -o /output_directory
+```
+The above example uses a single, isolength (type IIB) restriction enzyme to produce fragments, and by its nature, requires no size distribution.
 
 ## input options
 ```
@@ -74,6 +86,7 @@ The above example takes 'reference.fasta' as a genome file **g** to be digested 
   -sd SD           standard deviation (in bp) of read lengths after size selection
   -x X             fragment length where fragment distribution intersects size distribution
   -d D             json dictionary of fragment length:count for all expected bp fragments range
+  -free            distribution-free mode: bypass size selection process
   -c C             percent probability of per-site cut; use '1' for complete digestion of fragments (fragments will not contain internal RE sites)
   -a1 A1           file containing tab/space-separated adapters and barcode that attach 5' to read
   -a2 A2           file containing tab/space-separated adapters and barcode that attach 3' to read

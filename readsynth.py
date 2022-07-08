@@ -63,6 +63,9 @@ def parse_user_input():
     parser.add_argument('-d', type=str, required=False,
                         help='json dictionary of fragment length:count for all expected bp fragments range')
 
+    parser.add_argument('-free', dest='free', action='store_true',
+                        help='distribution-free mode: bypass size selection process')
+
     parser.add_argument('-c', type=float, required=False,
                         help='percent probability of per-site cut; use \'1\' for complete digestion of fragments (fragments will not contain internal RE sites)')
 
@@ -711,7 +714,7 @@ if __name__ == '__main__':
     and perform simulation of pooled size selection
     '''
     print('\n2. simulating size selection\n')
-    if args.iso:
+    if args.iso or args.free:
         fragment_comps = \
             total_freqs.groupby('length')['sum_prob'].apply(list).to_dict()
         fragment_comps = {k: sum(v) for k, v in fragment_comps.items()}
