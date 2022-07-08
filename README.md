@@ -16,7 +16,7 @@ The preparation of DNA sequencing libraries include many variables which influen
 To begin using readsynth for the first time, change to the src directory and run:
 ```
 make apply_error
-'''
+```
 
 Python packages numpy, pandas, and seaborn
 To install using pip:
