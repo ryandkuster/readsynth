@@ -312,6 +312,13 @@ def process_genomes(args, genomes_df):
             continue
 
         digest_file = process_df(df, digest_file, args)
+
+        if digest_file is None:
+            digest_ls.append(None)
+            prob_ls.append(None)
+            sys.stdout.write('□')
+            continue
+
         prob_file, len_freqs = prob_n_copies.main(digest_file, args)
         save_individual_hist(prob_file, args)
         digest_ls.append(digest_file)
@@ -405,7 +412,6 @@ def process_df(df, digest_file, args):
                              df['m2'].isin(args.motif_dt2.keys())), 1, 0)
     df['reverse'] = np.where((df['m1'].isin(args.motif_dt2.keys()) &
                              df['m2'].isin(args.motif_dt1.keys())), 1, 0)
-
     # remove unviable combos after getting site_ls
     df.drop(df[(df['forward'] == 0) & (df['reverse'] == 0)].index,
             inplace=True)
@@ -448,8 +454,9 @@ def process_df(df, digest_file, args):
         back = len(mot) - front
         df.loc[(df['m1'] == mot) & (df['reverse'] == 0), 'seq'] = \
             df['seq'].str[front:]
-        df.loc[(df['m1'] == mot) & (df['reverse'] == 0), 'revc'] = \
-            df['revc'].str[:-back]
+        if back != 0:
+            df.loc[(df['m1'] == mot) & (df['reverse'] == 0), 'revc'] = \
+                df['revc'].str[:-back]
 
         df.loc[(df['m1'] == mot) & (df['reverse'] == 1), 'seq'] = \
             df['seq'].str[:-back]
@@ -463,13 +470,17 @@ def process_df(df, digest_file, args):
 
         df.loc[(df['m2'] == mot) & (df['reverse'] == 1), 'seq'] = \
             df['seq'].str[front:]
-        df.loc[(df['m2'] == mot) & (df['reverse'] == 1), 'revc'] = \
-            df['revc'].str[:-back]
+        if back != 0:
+            df.loc[(df['m2'] == mot) & (df['reverse'] == 1), 'revc'] = \
+                df['revc'].str[:-back]
 
     df['length'] = df['seq'].str.len()
     df = df.sort_values(by=['length'])
     df = df.reset_index(drop=True)
     df.to_csv(digest_file, index=None)
+
+    if df.shape[0] == 0:
+        digest_file = None
 
     return digest_file
 
