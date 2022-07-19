@@ -13,10 +13,15 @@ import scripts.prob_n_copies_iso as pnci
 import scripts.write_reads as wr
 
 from pandas.testing import assert_frame_equal
+from unittest.mock import patch
+
 
 '''
 usage:
 python3 -m unittest test_readsynth.py
+
+to run with no stdout:
+python3 -m unittest test_readsynth.py -b
 '''
 
 
@@ -80,6 +85,41 @@ class Variables():
 
 
 class TestInitFunctions(unittest.TestCase):
+
+    def test_parse_user_input_1(self):
+        testargs = ['',
+                    '-g', 'abundances.csv',
+                    '-l1', '150',
+                    '-l2', '150',
+                    '-n', '1_000_000',
+                    '-u', '150',
+                    '-m1', 'ecori',
+                    '-m2', 'msei',
+                    '-o', './output',
+                    ]
+        with patch.object(sys, 'argv', testargs):
+            try:
+                args = rs.parse_user_input()
+            except SystemExit:
+                assert(True)
+
+    def test_parse_user_input_2(self):
+        testargs = ['',
+                    '-g', 'abundances.csv',
+                    '-l1', '150',
+                    '-l2', '150',
+                    '-n', '1_000_000',
+                    '-u', '150',
+                    '-sd', '50',
+                    '-iso', 'bcgi',
+                    '-o', './output',
+                    ]
+        with patch.object(sys, 'argv', testargs):
+            try:
+                args = rs.parse_user_input()
+                assert(args.iso == 'bcgi')
+            except SystemExit:
+                assert(False)
 
     def test_check_custom_distribution_1(self):
         args = Variables()

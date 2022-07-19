@@ -739,9 +739,6 @@ if __name__ == '__main__':
     total_freqs['counts'] = \
         round(total_freqs['counts'] * total_freqs['sum_prob'] * adjustment)
 
-    read_no = "{:,}".format(int(total_freqs['counts'].sum()))
-    print(f'\n{read_no} reads simulated\n')
-
     comb_file = os.path.join(args.o, 'combined.csv')
     total_freqs.to_csv(comb_file)
     save_combined_hist(total_freqs, 'read_distributions', 'counts', args)
