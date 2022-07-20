@@ -1,5 +1,4 @@
 ![readsynth_logo](resources/images/readsynth_logo_blue.png)
-# readsynth
 
 ## what is readsynth?
 Readsynth is a series of python scripts that simulate reduced-representation sequencing libraries with special consideration to DNA fragment abundance. Readsynth takes as input any reference nucleotide sequences in fasta format (i.e. reference genome or genomes) along with custom restriction enzyme and adapter information to simulate the reads expected from an Illumina-based sequencing reaction.
