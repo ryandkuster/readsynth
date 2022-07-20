@@ -1,3 +1,4 @@
+![readsynth_logo](resources/images/readsynth_logo_blue.png)
 # readsynth
 
 ## what is readsynth?
