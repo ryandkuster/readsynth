@@ -31,30 +31,24 @@ def parse_user_input():
                         help='path to store output')
 
     parser.add_argument('-m1', type=str, required='-iso' not in sys.argv, nargs='+',
-                        help='space separated list of RE motifs (e.g., AluI or AG/CT, HindIII or A/AGCTT, SmlI or C/TYRAG)')
+                        help='space separated list of search motifs (e.g., RE motifs AluI or AG/CT, or 16S primer /CCTACGGGNGGCWGCAG)')
 
     parser.add_argument('-m2', type=str, required='-iso' not in sys.argv, nargs='+',
-                        help='space separated list of RE motifs (e.g., AluI or AG/CT, HindIII or A/AGCTT, SmlI or C/TYRAG)')
+                        help='space separated list of search motifs (e.g., RE motifs SmlI or C/TYRAG, or 16S primer /GACTACHVGGGTATCTAANCC)')
 
     parser.add_argument('-iso', type=str, required=False,
-                        help='optional type IIB RE motif (e.g., NN/NNNNNNNNNNCGANNNNNNTGCNNNNNNNNNNNN/)')
+                        help='optional type IIB RE motif (e.g., BcgI or NN/NNNNNNNNNNCGANNNNNNTGCNNNNNNNNNNNN/)')
 
-    parser.add_argument('-l1', type=int, required=True,
+    parser.add_argument('-l', '-l1', type=int, required=True,
                         help='desired R1 read length of final simulated reads')
-
-    parser.add_argument('-l2', type=int, required=True,
-                        help='desired R2 read length of final simulated reads')
-
-    parser.add_argument('-test', dest='test', action='store_true',
-                        help='test mode: create newline-separated file of RE digested sequences only')
 
     parser.add_argument('-n', type=int, required=True,
                         help='total read number')
 
-    parser.add_argument('-u', type=int, required='-d' not in sys.argv,
+    parser.add_argument('-u', type=int, required='-sd' in sys.argv,
                         help='mean (in bp) of read lengths after size selection')
 
-    parser.add_argument('-sd', type=int, required='-d' not in sys.argv,
+    parser.add_argument('-sd', type=int, required='-u' in sys.argv,
                         help='standard deviation (in bp) of read lengths after size selection')
 
     parser.add_argument('-x', type=int, required=False,
@@ -63,32 +57,38 @@ def parse_user_input():
     parser.add_argument('-d', type=str, required=False,
                         help='json dictionary of fragment length:count for all expected bp fragments range')
 
-    parser.add_argument('-free', dest='free', action='store_true',
-                        help='distribution-free mode: bypass size selection process')
+    parser.add_argument('-lp', type=int, required=False,
+                        help='low-pass mode: defines maximum expected fragment size, distribution free')
 
     parser.add_argument('-c', type=float, required=False,
-                        help='percent probability of per-site cut; use \'1\' for complete digestion of fragments (fragments will not contain internal RE sites)')
+                        help='optional: percent probability of per-site cut; default 1 for complete digestion of fragments (fragments will not contain internal RE sites)')
 
     parser.add_argument('-a1', type=str, required=False,
-                        help='file containing tab/space-separated adapters and barcode that attach 5\' to read')
+                        help='optional: file containing tab/space-separated adapters and barcode that attach 5\' to read')
 
     parser.add_argument('-a2', type=str, required=False,
-                        help='file containing tab/space-separated adapters and barcode that attach 3\' to read')
+                        help='optional: file containing tab/space-separated adapters and barcode that attach 3\' to read')
 
     parser.add_argument('-a1s', type=int, required=False,
-                        help='manually provide bp length of adapter a1 before SBS begins')
+                        help='optional: manually provide bp length of adapter a1 before SBS begins')
 
     parser.add_argument('-a2s', type=int, required=False,
-                        help='manually provide bp length of adapter a1 before SBS begins')
+                        help='optional: manually provide bp length of adapter a1 before SBS begins')
 
     parser.add_argument('-q1', type=str, required=False,
-                        help='file containing newline-separated R1 Q scores >= length -l')
+                        help='optional: file containing newline-separated R1 Q scores >= length -l')
 
     parser.add_argument('-q2', type=str, required=False,
-                        help='file containing newline-separated R2 Q scores >= length -l')
+                        help='optional: file containing newline-separated R2 Q scores >= length -l')
 
     parser.add_argument('-e', type=str, required=False,
                         help='optional: filler base to use if full adapter contaminaton occurs')
+
+    parser.add_argument('-l2', type=int, required=False,
+                        help='optional: desired R2 read length of final simulated reads')
+
+    parser.add_argument('-test', dest='test', action='store_true',
+                        help='test mode: skip writing simulated fastq files')
 
     args = parser.parse_args()
 
@@ -117,6 +117,22 @@ def check_for_enzymes_iso(args, re_dt):
         m1 = args.iso
 
     return m1
+
+
+def check_for_palindrome(arg_m):
+    tmp_ls = []
+    for motif in arg_m:
+        cut_pos = motif.index('/')
+        orig = motif.replace('/', '')
+        revc_orig = reverse_comp(orig)
+        if orig == revc_orig:
+            pass
+        else:
+            revc_orig = revc_orig[:cut_pos] + '/' + revc_orig[cut_pos:]
+            tmp_ls.append(revc_orig)
+    arg_m += tmp_ls
+
+    return arg_m
 
 
 def iupac_motifs(arg_m):
@@ -548,7 +564,7 @@ def save_individual_hist(prob_file, args):
         plt.close()
 
     except ValueError:
-        print(f'too few bins to produce histogram for {prob_file}')
+        #print(f'too few bins to produce histogram for {prob_file}') #LOG
         return
 
 
@@ -662,6 +678,8 @@ if __name__ == '__main__':
         args.motif_dt = {}
         re_dt = open_enzyme_file(args)
         args.m1, args.m2 = check_for_enzymes(args, re_dt)
+        args.m1 = check_for_palindrome(args.m1)
+        args.m2 = check_for_palindrome(args.m2)
         args.motif_dt1 = iupac_motifs(args.m1)
         args.motif_dt.update(args.motif_dt1)
         args.motif_dt2 = iupac_motifs(args.m2)
@@ -671,10 +689,15 @@ if __name__ == '__main__':
 
     if args.d:
         args.max = check_custom_distribution(args)
-    else:
+    elif args.lp:
+        args.max = args.lp
+    elif args.u and args.sd:
         args.max = args.u + (6*args.sd)
-        if not args.x:
-            args.x = args.u
+    else:
+        sys.exit('must define -d, -lp, or -u/-sd')
+
+    if not args.x:
+        args.x = args.u
 
     if args.a1 and args.a2:
         args.a1 = get_adapters(args.a1)
@@ -689,6 +712,11 @@ if __name__ == '__main__':
     else:
         args.a1, args.a2 = create_adapters_iso(args)
         args.a1s, args.a2s = 62, 58
+
+    args.l1 = args.l
+
+    if not args.l2:
+        args.l2 = args.l1
 
     if args.q1 or args.q2:
         if not args.q1 or not args.q2:
@@ -725,7 +753,7 @@ if __name__ == '__main__':
     and perform simulation of pooled size selection
     '''
     print('\n2. simulating size selection\n')
-    if args.iso or args.free:
+    if args.iso or args.lp:
         fragment_comps = \
             total_freqs.groupby('length')['sum_prob'].apply(list).to_dict()
         fragment_comps = {k: sum(v) for k, v in fragment_comps.items()}

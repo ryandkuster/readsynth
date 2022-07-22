@@ -87,6 +87,9 @@ class Variables():
 class TestInitFunctions(unittest.TestCase):
 
     def test_parse_user_input_1(self):
+        '''
+        missing sd creates exit state
+        '''
         testargs = ['',
                     '-g', 'abundances.csv',
                     '-l1', '150',
@@ -100,8 +103,10 @@ class TestInitFunctions(unittest.TestCase):
         with patch.object(sys, 'argv', testargs):
             try:
                 args = rs.parse_user_input()
+                success = True
             except SystemExit:
-                assert(True)
+                success = False
+        self.assertEqual(success, False)
 
     def test_parse_user_input_2(self):
         testargs = ['',
