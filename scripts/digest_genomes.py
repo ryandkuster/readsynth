@@ -20,32 +20,30 @@ def main(args):
     else:
         fasta = open(args.g)
 
-    begin, gen_ls, seq = 0, [], ''
+    gen_ls, seq = [], ''
 
     for line in fasta:
         if line.startswith('>') and seq:
-            seq_ls = digest_seq(begin, seq, args)
+            seq_ls = digest_seq(chrom, seq, args)
             gen_ls.extend(seq_ls)
-            begin += len(seq)
             seq = ''
-            chr_name = line.rstrip()[1:].replace(' ', '_').replace(',', '')
+            chrom = line.rstrip().split(' ')[0][1:]
         elif line.startswith('>'):
-            chr_name = line.rstrip()[1:].replace(' ', '_').replace(',', '')
+            chrom = line.rstrip().split(' ')[0][1:]
         else:
             seq += line.rstrip().upper()
 
-    seq_ls = digest_seq(begin, seq, args)
+    seq_ls = digest_seq(chrom, seq, args)
     gen_ls.extend(seq_ls)
-    begin += len(seq)
     fasta.close()
 
     df = pd.DataFrame(gen_ls,
-                      columns=['seq', 'start', 'end', 'm1', 'm2', 'internal'])
+                      columns=['chrom', 'seq', 'start', 'end', 'm1', 'm2', 'internal'])
 
     return df
 
 
-def digest_seq(begin, seq, args):
+def digest_seq(chrom, seq, args):
     """
     for every chromosome (seq), find all RE recognition positions
     and preserve max bp ahead as a possible template (fragment)
@@ -57,12 +55,12 @@ def digest_seq(begin, seq, args):
         for idx in re.finditer('(?=' + motif1 + ')', seq):
             start = idx.start()
             fragment = seq[start: start + args.max]
-            seq_ls.extend(digest_frag(fragment, motif1, begin+start, args))
+            seq_ls.extend(digest_frag(chrom, fragment, motif1, start, args))
 
     return seq_ls
 
 
-def digest_frag(fragment, motif1, f_start, args):
+def digest_frag(chrom, fragment, motif1, f_start, args):
     '''
     further search each RE starting point + args.max for more
     RE sites, return list of seq, start, end, m1, m2
@@ -75,7 +73,8 @@ def digest_frag(fragment, motif1, f_start, args):
             end = idx.start()+1
             internals = internal_sites(fragment[1:end+args.motif_len[motif2]-1],
                                        args.motif_len.keys())
-            frag_ls.append([fragment[:end+args.motif_len[motif2]],
+            frag_ls.append([chrom,
+                            fragment[:end+args.motif_len[motif2]],
                             f_start,
                             f_start+end,
                             motif1,

@@ -275,8 +275,8 @@ class TestPalindromicFunctions(unittest.TestCase):
         seq = 'AAAAAAAAAAGCGCAAAAAAAAAAGCGCAAAAAAAAAA'
         args.motif_len = {'GCGC': 4}
         args.max = 200
-        expected = [['GCGCAAAAAAAAAAGCGC', 10, 24, 'GCGC', 'GCGC', 0]]
-        seq_ls = dg.digest_seq(0, seq, args)
+        expected = [['chromname', 'GCGCAAAAAAAAAAGCGC', 10, 24, 'GCGC', 'GCGC', 0]]
+        seq_ls = dg.digest_seq('chromname', seq, args)
         self.assertEqual(seq_ls, expected)
 
     def test_dg_digest_seq_2(self):
@@ -284,12 +284,11 @@ class TestPalindromicFunctions(unittest.TestCase):
         seq = 'AAAAAAAAAAGCGCAAAAAAAAAAGCGCAAAAAAAAAAGCGCAAAAAAAAAA'
         args.motif_len = {'GCGC': 4}
         args.max = 200
-        expected = [['GCGCAAAAAAAAAAGCGC', 10, 24, 'GCGC', 'GCGC', 0],
-                    ['GCGCAAAAAAAAAAGCGCAAAAAAAAAAGCGC', 10, 38, 'GCGC',
-                     'GCGC', 1],
-                    ['GCGCAAAAAAAAAAGCGC', 24, 38, 'GCGC', 'GCGC', 0],
+        expected = [['chromname', 'GCGCAAAAAAAAAAGCGC', 10, 24, 'GCGC', 'GCGC', 0],
+                    ['chromname', 'GCGCAAAAAAAAAAGCGCAAAAAAAAAAGCGC', 10, 38, 'GCGC', 'GCGC', 1],
+                    ['chromname', 'GCGCAAAAAAAAAAGCGC', 24, 38, 'GCGC', 'GCGC', 0],
                 ]
-        seq_ls = dg.digest_seq(0, seq, args)
+        seq_ls = dg.digest_seq('chromname', seq, args)
         self.assertCountEqual(seq_ls, expected)
 
     def test_dg_digest_seq_3(self):
@@ -297,18 +296,18 @@ class TestPalindromicFunctions(unittest.TestCase):
         seq = 'AAAAAAAAAAGCGCAAAAAAAAAAGCGCAAAAAAAAAAGCGCAAAAAAAAAA'
         args.motif_len = {'GCGC': 4}
         args.max = 20
-        expected = [['GCGCAAAAAAAAAAGCGC', 10, 24, 'GCGC', 'GCGC', 0],
-                    ['GCGCAAAAAAAAAAGCGC', 24, 38, 'GCGC', 'GCGC', 0],
+        expected = [['chromname', 'GCGCAAAAAAAAAAGCGC', 10, 24, 'GCGC', 'GCGC', 0],
+                    ['chromname', 'GCGCAAAAAAAAAAGCGC', 24, 38, 'GCGC', 'GCGC', 0],
                 ]
-        seq_ls = dg.digest_seq(0, seq, args)
+        seq_ls = dg.digest_seq('chromname', seq, args)
         self.assertCountEqual(seq_ls, expected)
 
     def test_dg_digest_seq_4(self):
         args = Variables()
         seq = 'AAAAAAAAAAGCGCAAAAAAAAAATTAAAAAAAAAAAA'
         args.motif_len = {'GCGC': 4, 'TTAA': 4}
-        expected = [['GCGCAAAAAAAAAATTAA', 10, 24, 'GCGC', 'TTAA', 0]]
-        seq_ls = dg.digest_seq(0, seq, args)
+        expected = [['chromname', 'GCGCAAAAAAAAAATTAA', 10, 24, 'GCGC', 'TTAA', 0]]
+        seq_ls = dg.digest_seq('chromname', seq, args)
         self.assertEqual(seq_ls, expected)
 
 
@@ -316,30 +315,29 @@ class TestPalindromicFunctions(unittest.TestCase):
         args = Variables()
         seq = 'AAAAAAAAAAGCGCAAAAAAAAAATTAAAAAAAAAAAAGCGCAAAAAAAAAA'
         args.motif_len = {'GCGC': 4, 'TTAA': 4}
-        expected = [['GCGCAAAAAAAAAATTAA', 10, 24, 'GCGC', 'TTAA', 0],
-                    ['GCGCAAAAAAAAAATTAAAAAAAAAAAAGCGC', 10, 38, 'GCGC',
-                     'GCGC', 1],
-                    ['TTAAAAAAAAAAAAGCGC', 24, 38, 'TTAA', 'GCGC', 0],
+        expected = [['chromname', 'GCGCAAAAAAAAAATTAA', 10, 24, 'GCGC', 'TTAA', 0],
+                    ['chromname', 'GCGCAAAAAAAAAATTAAAAAAAAAAAAGCGC', 10, 38, 'GCGC', 'GCGC', 1],
+                    ['chromname', 'TTAAAAAAAAAAAAGCGC', 24, 38, 'TTAA', 'GCGC', 0],
                 ]
-        seq_ls = dg.digest_seq(0, seq, args)
+        seq_ls = dg.digest_seq('chromname', seq, args)
         self.assertCountEqual(seq_ls, expected)
 
     def test_dg_digest_frag_1(self):
         args = Variables()
         seq = 'GCGCAAAAAAAAAATTAAAAAAAAAAAAGCGCAAAAAAAAAA'
         args.motif_len = {'GCGC': 4, 'TTAA': 4}
-        frag_ls = dg.digest_frag(seq, 'GCGC', 10, args)
-        expected = [['GCGCAAAAAAAAAATTAAAAAAAAAAAAGCGC', 10, 38, 'GCGC', 'GCGC', 1],
-                    ['GCGCAAAAAAAAAATTAA', 10, 24, 'GCGC', 'TTAA', 0]]
+        frag_ls = dg.digest_frag('chromname', seq, 'GCGC', 10, args)
+        expected = [['chromname', 'GCGCAAAAAAAAAATTAAAAAAAAAAAAGCGC', 10, 38, 'GCGC', 'GCGC', 1],
+                    ['chromname', 'GCGCAAAAAAAAAATTAA', 10, 24, 'GCGC', 'TTAA', 0]]
         self.assertCountEqual(frag_ls, expected)
 
     def test_dg_digest_frag_2(self):
         args = Variables()
         seq = 'GCGCAAAAAAAAAATTAAAAAAAAAAAAGCGCAAAAAAAAAA'
         args.motif_len = {'[ACGT]CGC': 4, 'TTAA': 4}
-        frag_ls = dg.digest_frag(seq, '[ACGT]CGC', 10, args)
-        expected = [['GCGCAAAAAAAAAATTAAAAAAAAAAAAGCGC', 10, 38, '[ACGT]CGC', '[ACGT]CGC', 1],
-                    ['GCGCAAAAAAAAAATTAA', 10, 24, '[ACGT]CGC', 'TTAA', 0]]
+        frag_ls = dg.digest_frag('chromname', seq, '[ACGT]CGC', 10, args)
+        expected = [['chromname', 'GCGCAAAAAAAAAATTAAAAAAAAAAAAGCGC', 10, 38, '[ACGT]CGC', '[ACGT]CGC', 1],
+                    ['chromname', 'GCGCAAAAAAAAAATTAA', 10, 24, '[ACGT]CGC', 'TTAA', 0]]
         self.assertCountEqual(frag_ls, expected)
 
     def test_internal_sites_1(self):
