@@ -61,13 +61,13 @@ The above example takes 'abundances.csv' as a genome abundance file **g** with a
 
 ## example 16S library creation
 ```
-readsynth.py -g abundances.csv   -m1 /CCTACGGGNGGCWGCAG /CTGCWGCCNCCCGTAGG -m2 /GACTACHVGGGTATCTAANCC /GGNTTAGATACCCBDGTAGTC -n 1_000_000 -free -l 150 -o /output_directory
+readsynth.py -g abundances.csv -m1 /CCTACGGGNGGCWGCAG -m2 /GACTACHVGGGTATCTAANCC -n 1_000_000 -lp -l 150 -o /output_directory
 ```
-The above example differs from the ddRADseq library creation in that in place of a single, palindromic restriction motif for -m1, we now provide the forward V3-V4 primer along with its reverse complement. Further, this library avoids applying a gaussian size selection step and utilizes the **free** argument to go distribution-free.
+The above example differs from the ddRADseq library creation in that in place of a single, palindromic restriction motif for -m1, we now provide the forward and reverse V3-V4 primers. Further, this library avoids applying a gaussian size selection step and utilizes the **lp** argument to avoid size selection and include reads up to a defined "low-pass" bp length.
 
 ## example isolength library creation
 ```
-readsynth.py -g abundances.csv -iso BcgI -n 1_000_000 -l 150 -o /output_directory
+readsynth.py -g abundances.csv -iso BcgI -n 1_000_000 -l 150 -lp 50 -o /output_directory
 ```
 The above example uses a single, isolength (type IIB) restriction enzyme to produce fragments, and by its nature, requires no size distribution.
 
@@ -76,24 +76,26 @@ The above example uses a single, isolength (type IIB) restriction enzyme to prod
   -h, --help       show this help message and exit
   -g G             path to file genome
   -o O             path to store output
-  -m1 M1 [M1 ...]  space separated list of RE motifs (e.g., AluI or AG/CT, HindIII or A/AGCTT, SmlI or C/TYRAG)
-  -m2 M2 [M2 ...]  space separated list of RE motifs (e.g., AluI or AG/CT, HindIII or A/AGCTT, SmlI or C/TYRAG)
-  -iso ISO         optional type IIB RE motif (e.g., NN/NNNNNNNNNNCGANNNNNNTGCNNNNNNNNNNNN/)
-  -l L             desired read length of final simulated reads
-  -test            test mode: create newline-separated file of RE digested sequences only
+  -m1 M1 [M1 ...]  space separated list of search motifs (e.g., RE motifs AluI or AG/CT, or 16S primer /CCTACGGGNGGCWGCAG)
+  -m2 M2 [M2 ...]  space separated list of search motifs (e.g., RE motifs SmlI or C/TYRAG, or 16S primer /GACTACHVGGGTATCTAANCC)
+  -iso ISO         optional type IIB RE motif (e.g., BcgI or NN/NNNNNNNNNNCGANNNNNNTGCNNNNNNNNNNNN/)
+  -l L, -l1 L      desired R1 read length of final simulated reads
   -n N             total read number
   -u U             mean (in bp) of read lengths after size selection
   -sd SD           standard deviation (in bp) of read lengths after size selection
   -x X             fragment length where fragment distribution intersects size distribution
   -d D             json dictionary of fragment length:count for all expected bp fragments range
-  -free            distribution-free mode: bypass size selection process
-  -c C             percent probability of per-site cut; use '1' for complete digestion of fragments (fragments will not contain internal RE sites)
-  -a1 A1           file containing tab/space-separated adapters and barcode that attach 5' to read
-  -a2 A2           file containing tab/space-separated adapters and barcode that attach 3' to read
-  -a1s A1S         manually provide bp length of adapter a1 before SBS begins
-  -a2s A2S         manually provide bp length of adapter a1 before SBS begins
-  -q1 Q1           file containing newline-separated R1 Q scores >= length -l
-  -q2 Q2           file containing newline-separated R2 Q scores >= length -l
+  -lp LP           low-pass mode: defines maximum expected fragment size, distribution free
+  -c C             optional: percent probability of per-site cut; default 1 for complete digestion of fragments (fragments will not contain internal RE sites)
+  -a1 A1           optional: file containing tab/space-separated adapters and barcode that attach 5' to read
+  -a2 A2           optional: file containing tab/space-separated adapters and barcode that attach 3' to read
+  -a1s A1S         optional: manually provide bp length of adapter a1 before SBS begins
+  -a2s A2S         optional: manually provide bp length of adapter a1 before SBS begins
+  -q1 Q1           optional: file containing newline-separated R1 Q scores >= length -l
+  -q2 Q2           optional: file containing newline-separated R2 Q scores >= length -l
+  -e E             optional: filler base to use if full adapter contaminaton occurs
+  -l2 L2           optional: desired R2 read length of final simulated reads
+  -test            test mode: skip writing simulated fastq files
 ```
 
 # software overview
