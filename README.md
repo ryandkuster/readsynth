@@ -1,7 +1,9 @@
+readsynth is currently in an early release state for testing purposes. If you have any suggestions, questions, or concerns, please contact rkuster@utk.edu.
+
 ![readsynth_logo](resources/images/readsynth_logo_blue.png)
 
 ## what is readsynth?
-Readsynth is a series of python scripts that simulate reduced-representation sequencing libraries with special consideration to DNA fragment abundance. Readsynth takes as input any reference nucleotide sequences in fasta format (i.e. reference genome or genomes) along with custom restriction enzyme and adapter information to simulate the reads expected from an Illumina-based sequencing reaction.
+Readsynth is a series of python scripts that simulate reduced-representation and targeted sequencing libraries with special consideration to DNA fragment abundances. Readsynth takes as input any reference nucleotide sequences in fasta format (i.e. reference genome or genomes) along with custom restriction enzyme and adapter information to simulate the reads expected from an Illumina-based sequencing reaction.
 
 Readsynth is aimed at standardizing reduced-metagenome sequencing (RMS) libraries, where diverse community members are expected to yield differences in abundance due to molecular sequencing preparation.
 
@@ -10,10 +12,10 @@ Readsynth is aimed at standardizing reduced-metagenome sequencing (RMS) librarie
 ![fragment_distribution](resources/images/_read_distributions.png)
 
 ## what makes readsynth different?
-The preparation of DNA sequencing libraries include many variables which influence the frequency of a given read, including restriction enzyme site frequency in the sample genome(s), enzyme digestion efficiency, size-selection, as well as PCR bias based on DNA fragment length. Readsynth allows users to control common sources of variability introduced in typical enzymatic library preparations (e.g. RADseq, ddRADseq, GBS, etc.).
+The preparation of DNA sequencing libraries include many variables which influence the frequency of a given read, including restriction enzyme site frequency in a taxa-dependent manner, enzyme digestion efficiency, size-selection, as well as the resulting biases caused by preferential DNA fragment length. Readsynth allows users to control common sources of variability introduced in typical enzymatic library preparations.
 
 ## requirements
-To begin using readsynth for the first time, change to the src directory and run:
+To begin using readsynth for the first time, change to "src" within the readsynth directory and run:
 ```
 make apply_error
 ```
@@ -26,7 +28,7 @@ python3 -m pip install pandas
 python3 -m pip install seaborn
 ```
 
-To install using conda (in a conda environment):
+Optionally, to install using conda (within a single conda environment):
 ```
 conda install numpy
 conda install pandas
@@ -59,13 +61,13 @@ readsynth.py -g abundances.csv -m1 EcoRI -m2 T/TAA -n 1_000_000 -c 0.90 -u 300 -
 ```
 The above example takes 'abundances.csv' as a genome abundance file **g** with all reference fasta files to be digested with EcoRI (**m1**) and MseI (**m2**) in a strand-specific fashion (e.g. the forward adapter always ligates with the /AATTC overhang from EcoRI). Assuming a desired output of 1 million reads (**n**) in total, digest simulation will calculate the expected number of DNA fragments given the enzyme digestion cut efficiency (**c**) occurs at a probability of 90% at any random RE motif. The resulting fragments will be size-selected using a normal distribution defined by **u** and **sd**. Paired-end Illumina reads of length (**l**) 150bp will be written to a simulated fastq file (default output has perfect scores).
 
-## example 16S library creation
+## example amplicon library creation
 ```
 readsynth.py -g abundances.csv -m1 /CCTACGGGNGGCWGCAG -m2 /GACTACHVGGGTATCTAANCC -n 1_000_000 -lp -l 150 -o /output_directory
 ```
 The above example differs from the ddRADseq library creation in that in place of a single, palindromic restriction motif for -m1, we now provide the forward and reverse V3-V4 primers. Further, this library avoids applying a gaussian size selection step and utilizes the **lp** argument to avoid size selection and include reads up to a defined "low-pass" bp length.
 
-## example isolength library creation
+## example isolength enzyme (type IIb) library creation
 ```
 readsynth.py -g abundances.csv -iso BcgI -n 1_000_000 -l 150 -lp 50 -o /output_directory
 ```
