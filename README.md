@@ -11,16 +11,16 @@ Readsynth is aimed at optimizing sequencing effort and library prep settings to 
 - creating a ground truth for benchmarking profiling software
 
 ## contents
-- [overview](<overview>)
-- [requirements](<requirements>)
-- [usage](<usage>)
-  - [installation](<installation>)
-  - [memory considerations](<memory considerations>)
-  - [example ddRADseq library creation](<example ddRADseq library simulation>)
-  - [example amplicon library creation](<example amplicon library simulation>)
-  - [example isolength enzyme (type IIb) library creation](<example isolength enzyme (type IIb) library simulation>)
-  - [optional parameters](<optional parameters>)
-- [software details](<software details>)
+- [overview](#overview)
+- [requirements](#requirements)
+- [usage](#usage)
+  - [installation](#installation)
+  - [memory considerations](#memory-considerations)
+  - [example ddRADseq library simulation](#example-ddRADseq-library-simulation)
+  - [example amplicon library simulation](#example-amplicon-library-simulation)
+  - [example isolength enzyme library simulation](#example-isolength-enzyme-library-simulation)
+  - [optional parameters](#optional-parameters)
+- [software details](#software-details)
 - [license](#license)
 
 ## overview
@@ -80,7 +80,7 @@ make apply_error
 
 Readsynth is designed for assessing bacterial and fungal genomes and currently isn't optimized for use with larger eukaryotic genomes. To include larger genomes, it is recommended to split these fasta files into individual sequence files and input each of those into the abundance table. Memory usage will vary: a large sequence length combined with highly abundant motif sites will require enough ram to store every possible fragment produced in the expected fragment distribution.
 
-### example ddRADseq library creation
+### example ddRADseq library simulation
 
 ```
 python3 readsynth.py -g abundances.csv -m1 EcoRI -m2 T/TAA -n 1_000_000 -c 0.90 -u 300 -sd 100 -l 150 -o /output_directory
@@ -103,7 +103,7 @@ The above example takes 'abundances.csv' as a genome abundance file **g** with a
   -lp LP           low-pass mode: defines maximum expected fragment size, distribution free
 ```
 
-### example amplicon library creation
+### example amplicon library simulation
 
 ```
 python3 readsynth.py -g abundances.csv -m1 /CCTACGGGNGGCWGCAG -m2 /GACTACHVGGGTATCTAANCC -n 1_000_000 -lp 1000 -l 150 -o /output_directory
@@ -122,7 +122,7 @@ The above example takes 'abundances.csv' as a genome abundance file **g** with a
   -lp LP           low-pass mode: defines maximum expected amplicon size
 ```
 
-### example isolength enzyme (type IIb) library creation
+### example isolength enzyme library simulation
 
 ```
 python3 readsynth.py -g abundances.csv -iso BcgI -n 1_000_000 -l 150 -lp 50 -o /output_directory
