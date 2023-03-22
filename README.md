@@ -60,8 +60,10 @@ make apply_error
 ```
 
 ### requirements
+Python 3.7 and higher
 
 Python packages numpy, pandas, and seaborn
+
 To install using pip:
 ```
 python3 -m pip install numpy
