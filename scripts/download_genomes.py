@@ -45,7 +45,7 @@ def main():
             file_name = os.path.join(sys.argv[3], os.path.basename(best_assembly))
             f1.write(f'{taxid}\t{cat}\t{lev}\t{rel}\t{rep}\t{date}\t{best_assembly}\n')
             f2.write(f'{file_name},{abund}\n')
-            #subprocess.call(['wget', best_assembly, '-P', sys.argv[3]])
+            subprocess.call(['wget', best_assembly, '-P', sys.argv[3]])
 
 
 def open_taxids():
