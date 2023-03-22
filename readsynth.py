@@ -736,7 +736,7 @@ if __name__ == '__main__':
     '''
     genomes_df = check_genomes(args.g)
 
-    print('\n1. simulating enzyme digests\n')
+    print('\n1. finding target sequences\n')
     if args.iso:
         genomes_df, total_freqs = process_genomes_iso(args, genomes_df)
     else:

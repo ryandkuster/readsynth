@@ -12,9 +12,9 @@ Readsynth is aimed at optimizing sequencing effort and library prep settings to 
 
 ## contents
 - [overview](#overview)
-- [requirements](#requirements)
 - [usage](#usage)
   - [installation](#installation)
+  - [requirements](#requirements)
   - [memory considerations](#memory-considerations)
   - [example ddRADseq library simulation](#example-ddRADseq-library-simulation)
   - [example amplicon library simulation](#example-amplicon-library-simulation)
@@ -48,7 +48,18 @@ The preparation of DNA sequencing libraries includes many factors which influenc
 ![fragment_distribution](resources/images/_fragment_distributions.png)
 ![fragment_distribution](resources/images/_read_distributions.png)
 
-## requirements
+## usage
+
+### installation
+
+First, download readsynth from this github page.
+
+To begin using readsynth for the first time, change to "src" within the readsynth directory and run:
+```
+make apply_error
+```
+
+### requirements
 
 Python packages numpy, pandas, and seaborn
 To install using pip:
@@ -63,17 +74,6 @@ Optionally, to install using conda (within a single conda environment):
 conda install numpy
 conda install pandas
 conda install seaborn
-```
-
-## usage
-
-### installation
-
-First, download readsynth from this github page.
-
-To begin using readsynth for the first time, change to "src" within the readsynth directory and run:
-```
-make apply_error
 ```
 
 ### memory considerations
