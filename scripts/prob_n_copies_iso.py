@@ -12,7 +12,7 @@ def main(digest_file, args):
     df = find_overlaps(df)
     df = calculate_prob(df)
 
-    prob_file = os.path.join(args.o, 'counts_' +
+    prob_file = os.path.join(args.o, 'individual_counts', 'counts_' +
                              os.path.basename(args.g) + '.csv')
     df['adj_prob'] = df['probability'] * args.comp
     df = df.reset_index(drop=True)

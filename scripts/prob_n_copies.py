@@ -3,7 +3,6 @@
 import os
 import pandas as pd
 
-
 def main(digest_file, args):
 
     df = pd.read_csv(digest_file)
@@ -11,9 +10,10 @@ def main(digest_file, args):
     copies_dt = copies_dict(internal_max, args)
 
     df = apply_approach(df, copies_dt)
-    prob_file = os.path.join(args.o, 'counts_' +
+    prob_file = os.path.join(args.o, 'individual_counts', 'counts_' +
                              os.path.basename(args.g) + '.csv')
     df.drop(df[df['probability'] == 0].index, inplace=True)
+    df['probability'] = df['probability'].astype(float)
 
     if df.duplicated(subset=['start','end']).any():
         df = bidirectional_weights(df)

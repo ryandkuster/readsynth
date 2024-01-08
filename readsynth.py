@@ -304,19 +304,16 @@ def process_genomes(args, genomes_df):
     genomes to be processed
     '''
     digest_ls, prob_ls = [], []
-    total_freqs = pd.DataFrame(columns=['length',
-                                        'sum_prob',
-                                        'name',
-                                        'counts_file'])
-
-    sys.stdout.write("%s" % ("□" * genomes_df.shape[0]))
-    sys.stdout.flush()
-    sys.stdout.write("\b" * (genomes_df.shape[0]+1)) # return to start of line, after '[' 
+    total_freqs = pd.DataFrame({'length': pd.Series(dtype='int64'),
+                                'sum_prob': pd.Series(dtype='float64'),
+                                'name': pd.Series(dtype='object'),
+                                'counts_file': pd.Series(dtype='object')})
 
     for idx in range(genomes_df.shape[0]):
         args.g = genomes_df.iloc[idx]['genome']
+        print(args.g)
         args.comp = genomes_df.iloc[idx]['abundance']
-        digest_file = os.path.join(args.o, 'raw_digest_' +
+        digest_file = os.path.join(args.o, 'raw_digests', 'raw_digest_' +
                                    os.path.basename(args.g) + '.csv')
 
         df = digest_genomes.main(args)
@@ -324,7 +321,6 @@ def process_genomes(args, genomes_df):
         if df.shape[0] == 0:
             digest_ls.append(None)
             prob_ls.append(None)
-            sys.stdout.write('□')
             continue
 
         digest_file = process_df(df, digest_file, args)
@@ -332,7 +328,6 @@ def process_genomes(args, genomes_df):
         if digest_file is None:
             digest_ls.append(None)
             prob_ls.append(None)
-            sys.stdout.write('□')
             continue
 
         prob_file, len_freqs = prob_n_copies.main(digest_file, args)
@@ -342,12 +337,8 @@ def process_genomes(args, genomes_df):
         tmp_df = pd.DataFrame(len_freqs.items(), columns=['length', 'sum_prob'])
         tmp_df['name'] = os.path.basename(args.g)
         tmp_df['counts_file'] = prob_file
-        total_freqs = pd.concat([total_freqs, tmp_df], axis=0)
-
-        sys.stdout.write('■')
-        sys.stdout.flush()
-
-    sys.stdout.write("\n")
+        if tmp_df.empty is False:
+            total_freqs = pd.concat([total_freqs, tmp_df], axis=0)
 
     total_freqs = total_freqs.reset_index(drop=True)
     genomes_df['digest_file'] = digest_ls
@@ -366,16 +357,16 @@ def process_genomes_iso(args, genomes_df):
     genomes to be processed
     '''
     digest_ls, prob_ls = [], []
-    total_freqs = pd.DataFrame(columns=['length', 'sum_prob', 'name', 'counts_file'])
-
-    sys.stdout.write("%s" % ("□" * genomes_df.shape[0]))
-    sys.stdout.flush()
-    sys.stdout.write("\b" * (genomes_df.shape[0]+1)) # return to start of line, after '[' 
+    total_freqs = pd.DataFrame({'length': pd.Series(dtype='int64'),
+                                'sum_prob': pd.Series(dtype='float64'),
+                                'name': pd.Series(dtype='object'),
+                                'counts_file': pd.Series(dtype='object')})
 
     for idx in range(genomes_df.shape[0]):
         args.g = genomes_df.iloc[idx]['genome']
+        print(args.g)
         args.comp = genomes_df.iloc[idx]['abundance']
-        digest_file = os.path.join(args.o, 'raw_digest_' +
+        digest_file = os.path.join(args.o, 'raw_digests', 'raw_digest_' +
                                    os.path.basename(args.g) + '.csv')
 
         df = digest_genomes_iso.main(args)
@@ -383,7 +374,6 @@ def process_genomes_iso(args, genomes_df):
         if df.shape[0] == 0:
             digest_ls.append(None)
             prob_ls.append(None)
-            sys.stdout.write('□')
             continue
 
         digest_file = process_df_iso(df, digest_file, args)
@@ -393,12 +383,8 @@ def process_genomes_iso(args, genomes_df):
         tmp_df = pd.DataFrame(len_freqs.items(), columns=['length', 'sum_prob'])
         tmp_df['name'] = os.path.basename(args.g)
         tmp_df['counts_file'] = prob_file
-        total_freqs = pd.concat([total_freqs, tmp_df], axis=0)
-
-        sys.stdout.write('■')
-        sys.stdout.flush()
-
-    sys.stdout.write("\n")
+        if tmp_df.empty is False:
+            total_freqs = pd.concat([total_freqs, tmp_df], axis=0)
 
     total_freqs = total_freqs.reset_index(drop=True)
     genomes_df['digest_file'] = digest_ls
@@ -558,7 +544,7 @@ def save_individual_hist(prob_file, args):
                      binwidth=6,
                      alpha=0.75,
                      color='blue')
-        plt.savefig(os.path.join(args.o, 'hist_' +
+        plt.savefig(os.path.join(args.o, 'individual_histograms', 'hist_' +
                     os.path.basename(prob_file)[:-4] + '.png'),
                     facecolor='white', transparent=False)
         plt.close()
@@ -578,11 +564,11 @@ def save_combined_hist(total_freqs, image_name, weights, args):
         return
 
     old_legend = ax.legend_
-    handles = old_legend.legendHandles
+    handles = old_legend.legend_handles
     labels = [t.get_text() for t in old_legend.get_texts()]
     ax.legend(handles, labels, bbox_to_anchor=(1.02, 1), loc='upper left',
               borderaxespad=0)
-    plt.savefig(os.path.join(args.o, f'_{image_name}.pdf'),
+    plt.savefig(os.path.join(args.o, f'{image_name}.pdf'),
                 bbox_inches='tight')
     plt.close()
 
@@ -665,6 +651,9 @@ if __name__ == '__main__':
         args.o = os.path.dirname(os.path.abspath(__file__))
     elif os.path.exists(args.o) is True:
         args.o = os.path.abspath(args.o)
+        os.mkdir(os.path.join(args.o, "raw_digests"))
+        os.mkdir(os.path.join(args.o, "individual_histograms"))
+        os.mkdir(os.path.join(args.o, "individual_counts"))
     else:
         sys.exit('directory not found at ' + os.path.abspath(args.o))
 
