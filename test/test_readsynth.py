@@ -379,8 +379,10 @@ class TestPalindromicFunctions(unittest.TestCase):
         digest_file = 'test_data/genomes/hhai_hhai_process_df_test.csv'
         digest_file = rs.process_df(df, digest_file, args)
         df2 = pd.read_csv(digest_file)
+        df2 = df2.sort_values(by = ['seq', 'start', 'end'])
         expected = pd.read_csv(
             'test_data/genomes/hhai_hhai_raw_digest_test1.fasta.csv')
+        expected = expected.sort_values(by = ['seq', 'start', 'end'])
         assert_frame_equal(df2, expected)
 
     def test_process_df_2(self):
