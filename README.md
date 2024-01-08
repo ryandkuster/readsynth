@@ -1,6 +1,6 @@
 readsynth is currently in an early release state for testing purposes. If you have any suggestions, questions, or concerns, please contact rkuster@utk.edu.
 
-![readsynth_logo](resources/images/readsynth_logo_blue.png)
+<img src=resources/images/readsynth_logo_blue.png width="600">
 
 ## what is readsynth?
 Readsynth simulates Illumina sequenced metagenomes allowing comparison of library approaches including amplicon and reduced metagenome sequencing (RMS). The software takes as input any reference genome sequences in fasta format along with custom primer/restriction enzyme and adapter sequences to simulate the reads expected from an Illumina-based sequencing reaction. Simulated fastq reads capture the expected composition of the input taxa, and are sensitive to changes in the underlying distributions of DNA fragments when digests or size selection are performed. 
@@ -35,7 +35,7 @@ The preparation of DNA sequencing libraries includes many factors which influenc
 - optional: pre-existing fastq data to train error profile
 - see full list of custom settings in 'optional parameters'
 
-![example_abundance_file](resources/images/abundances.png)
+<img src=resources/images/abundances.png width="600">
 
 **outputs**
 - simulated fastq file of expected reads (paired end)
@@ -45,8 +45,8 @@ The preparation of DNA sequencing libraries includes many factors which influenc
 - csv summary of reads produced
 - individual and stacked distributions before and after size selection (see images below)
 
-![fragment_distribution](resources/images/_fragment_distributions.png)
-![fragment_distribution](resources/images/_read_distributions.png)
+<img src=resources/images/_fragment_distributions.png width="600">
+<img src=resources/images/_read_distributions.png width="600">
 
 ## usage
 
