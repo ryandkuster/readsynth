@@ -630,7 +630,9 @@ def write_genomes(comb_file, fragment_comps, adjustment):
         print('applying error profile')
         command = os.path.join(os.path.dirname(__file__), "src", "apply_error")
         simulate_error(command, sim1, error1)
+        os.remove(sim1)
         simulate_error(command, sim2, error2)
+        os.remove(sim2)
 
 
 def simulate_error(command, sim_in, error_out):
@@ -708,6 +710,10 @@ if __name__ == '__main__':
         args.l2 = args.l1
 
     if args.q1 or args.q2:
+        q_src = os.path.join(os.path.dirname(__file__), "src", "apply_error")
+        if not os.path.exists(q_src):
+            sys.exit('please run \'make apply_error\' in the src directory of'\
+                     'readsynth')
         if not args.q1 or not args.q2:
             sys.exit('arguments q1 and q2 required')
 
