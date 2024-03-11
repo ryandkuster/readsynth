@@ -132,6 +132,10 @@ def apply_probs(first, last, events):
 
 
 def get_len_freqs(df, max_len):
+    """
+    return dictionary (len_freqs) of fragment length : sum of adjusted
+    probabilities for each length
+    """
     len_freqs = {}
 
     for i in range(0, max_len+1):

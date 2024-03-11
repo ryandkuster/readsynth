@@ -1,4 +1,15 @@
 #!/usr/bin/env python
+"""
+File: readsynth.py
+Author: Ryan Kuster
+Date: March 4, 2024
+Description:
+  Main script in readsynth. Imports necessary helper scripts for:
+    - simulated digestion (ddradseq and iso approaches)
+    - per-fragment probability estimation (ddradseq and iso approaches)
+    - size selection simulation
+License: Apache-2.0 license
+"""
 
 import argparse
 import json
@@ -96,6 +107,10 @@ def parse_user_input():
 
 
 def open_enzyme_file(args):
+    """
+    open pickle file of common, named RE motifs
+    return dictionary of enzyme names : motifs
+    """
     with open(os.path.join(os.path.dirname(__file__),
               args.enzyme_file), 'rb') as type_iip_file:
         re_dt = pickle.load(type_iip_file)
@@ -104,6 +119,10 @@ def open_enzyme_file(args):
 
 
 def check_for_enzymes(args, re_dt):
+    """
+    check if user input is named restriction enzyme
+    return either dictionary value or unmodified user input (m1, m2)
+    """
     m1 = [re_dt[i.lower()] if i.lower() in re_dt.keys() else i for i in args.m1]
     m2 = [re_dt[i.lower()] if i.lower() in re_dt.keys() else i for i in args.m2]
 
@@ -111,6 +130,10 @@ def check_for_enzymes(args, re_dt):
 
 
 def check_for_enzymes_iso(args, re_dt):
+    """
+    check if user input is named restriction enzyme
+    return either dictionary value or unmodified user input (m1)
+    """
     if args.iso.lower() in re_dt.keys():
         m1 = re_dt[args.iso.lower()]
     else:
@@ -120,6 +143,16 @@ def check_for_enzymes_iso(args, re_dt):
 
 
 def check_for_palindrome(arg_m):
+    """
+    most RE motifs are palindromic, but for those that are not, apply
+    a cut position in the reverse complement at the corresponding site
+    as the input and return a list of sequence(s) with cut index
+    per motif:
+      - find the cut position ("/") index
+      - get the reverse complement of the input sequence
+      - check if reverse complement = input (palindromic)
+      - if not palindromic, 
+    """
     tmp_ls = []
     for motif in arg_m:
         cut_pos = motif.index('/')
@@ -207,6 +240,10 @@ def iupac_motifs_iso(arg_m):
 
 
 def get_motif_regex_len(args):
+    """
+    returns a dictionary (motif_len) of RE motifs and their final
+    length (adjusting for redundant IUPAC bases)
+    """
     motif_len = {}
     for motif in args.motif_dt.keys():
         mot_len, count = 0, True
@@ -225,6 +262,11 @@ def get_motif_regex_len(args):
 
 
 def check_custom_distribution(args):
+    """
+    if user provides a custom json distribution of fragment lengths,
+    load file and create dictionary (confirm data format works)
+    return the maximum fragment size for use in simulations
+    """
     with open(args.d) as f_o:
         tmp_dt = json.load(f_o)
     tmp_dt = {int(k): int(v) for k, v in tmp_dt.items()}
@@ -246,6 +288,12 @@ def get_adapters(adapter_file):
 
 
 def create_adapters(args):
+    """
+    default adapters used for simulating reads where fragment less than
+    input read length
+    returns list of [adapter, adapter name] where sequence is modified
+    with the expected overhang based on the RE motifs
+    """
     a1 = ['AATGATACGGCGACCACCGAGATCTACACTCGTCGGCAGCGTCAGATGTGTATAAGAGACAG',
           'CTGTCTCTTATACACATCTGACGCTGCCGACGAGTGTAGATCTCGGTGGTCGCCGTATCATT',
           'rs1']
@@ -263,6 +311,15 @@ def create_adapters(args):
 
 
 def create_adapters_iso(args):
+    """
+    default adapters used for simulating reads where fragment less than
+    input read length
+    returns list of [adapter, adapter name] where sequence is modified
+    with the expected overhang based on the iso-length RE motifs
+
+    note: the overhang behavior differs from standard RE motifs and is a
+    fill of "N" for the distance to the cut site
+    """
     a1 = ['AATGATACGGCGACCACCGAGATCTACACTCGTCGGCAGCGTCAGATGTGTATAAGAGACAG',
           'CTGTCTCTTATACACATCTGACGCTGCCGACGAGTGTAGATCTCGGTGGTCGCCGTATCATT',
           'rs1']
@@ -410,36 +467,61 @@ def reverse_comp(seq):
 
 
 def process_df(df, digest_file, args):
+    """
+    upon completion of simulated digest:
+      - filter the pandas dataframe keeping only viable combinations of
+        REs that will produce a library
+      - replace redundant bases with N
+      - account for viable reverse complements
+      - trim over/underhang from the produced fragments
+      - save as dataframe
+    """
+
     df['forward'] = np.where((df['m1'].isin(args.motif_dt1.keys()) &
                              df['m2'].isin(args.motif_dt2.keys())), 1, 0)
     df['reverse'] = np.where((df['m1'].isin(args.motif_dt2.keys()) &
                              df['m2'].isin(args.motif_dt1.keys())), 1, 0)
-    # remove unviable combos after getting site_ls
+
+    """
+    remove unviable combos after getting site_ls
+    """
     df.drop(df[(df['forward'] == 0) & (df['reverse'] == 0)].index,
             inplace=True)
     df = df.reset_index(drop=True)
 
-    # convert all redundant IUPAC codes to 'N'
+    """
+    convert all redundant IUPAC codes to 'N'
+    """
     df['seq'] = df['seq'].str.replace('[RYSWKMBDHV]', 'N', regex=True)
 
-    # create a column of reverse complement sequences
+    """
+    create a column of reverse complement sequences
+    """
     df['revc'] = [reverse_comp(i) for i in df['seq'].to_list()]
 
-    # use tmp_df to temporarilty store bidirectional reads
-    # duplicate all the reads that work both ways (if RE in m1 and m2)
+    """
+    use tmp_df to temporarilty store bidirectional reads
+    duplicate all the reads that work both ways (if RE in m1 and m2)
+    """
     tmp_df = df[(df['forward'] == 1) & (df['reverse'] == 1)]
     tmp_df = tmp_df.reset_index(drop=True)
 
-    # recategorize the bidirectional seqs in df as being forward
+    """
+    recategorize the bidirectional seqs in df as being forward
+    """
     df.loc[(df['forward'] == 1) & (df['reverse'] == 1), 'reverse'] = 0
 
-    # convert unidirectional reverse strand sequences to the reverse complement
+    """
+    convert unidirectional reverse strand sequences to the reverse complement
+    """
     df.loc[df['reverse'] == 1, 'tmp_seq'] = df['revc']
     df.loc[df['reverse'] == 1, 'revc'] = df['seq']
     df.loc[df['reverse'] == 1, 'seq'] = df['tmp_seq']
     df.drop('tmp_seq', axis=1, inplace=True)
 
-    # make all tmp_df reads reverse complements and recategorize as reverse
+    """
+    make all tmp_df reads reverse complements and recategorize as reverse
+    """
     tmp_df['tmp_seq'] = tmp_df['revc'].values
     tmp_df['revc'] = tmp_df['seq'].values
     tmp_df['seq'] = tmp_df['tmp_seq'].values
@@ -451,7 +533,9 @@ def process_df(df, digest_file, args):
     df.drop('forward', axis=1, inplace=True)
     df = df.reset_index(drop=True)
 
-    # add a quick step that removes appropriate over/underhang
+    """
+    add a quick step that removes appropriate over/underhang
+    """
     for mot, front in args.motif_dt.items():
         back = len(mot) - front
         df.loc[(df['m1'] == mot) & (df['reverse'] == 0), 'seq'] = \
@@ -488,23 +572,39 @@ def process_df(df, digest_file, args):
 
 
 def process_df_iso(df, digest_file, args):
+    """
+    upon completion of simulated digest:
+      - replace redundant bases with N
+      - account for viable reverse complements
+      - trim over/underhang from the produced fragments
+      - save as dataframe
+    """
+
     df['forward'] = np.where(df['m1'] == list(args.motif_dt.keys())[0], 1, 0)
     df['reverse'] = np.where(df['m1'] == list(args.motif_dt.keys())[1], 1, 0)
 
-    # convert all redundant IUPAC codes to 'N'
+    """
+    convert all redundant IUPAC codes to 'N'
+    """
     df['seq'] = df['seq'].str.replace('[RYSWKMBDHV]', 'N', regex=True)
 
-    # create a column of reverse complement sequences
+    """
+    create a column of reverse complement sequences
+    """
     df['revc'] = [reverse_comp(i) for i in df['seq'].to_list()]
 
-    # swap seq and revc for fragments on the reverse direction
+    """
+    swap seq and revc for fragments on the reverse direction
+    """
     tmp_df = df['reverse'] == 1
     df.loc[tmp_df, ['seq', 'revc']] = (df.loc[tmp_df, ['revc', 'seq']].values)
 
     df.drop('forward', axis=1, inplace=True)
     df = df.reset_index(drop=True)
 
-    # add a quick step that removes appropriate over/underhang
+    """
+    add a quick step that removes appropriate over/underhang
+    """
     m1 = list(args.motif_dt.keys())[0]
     m1_f = args.motif_dt[m1][0]
     m1_b = args.motif_dt[m1][1]
@@ -521,6 +621,12 @@ def process_df_iso(df, digest_file, args):
 
 
 def save_individual_hist(prob_file, args):
+    """
+    per genome in the sample, create a distribution of frament lengths:
+      - red: all fragments (raw counts)
+      - gold: fragments after applying frequency/size distributin
+      - blue: frequency/size adjusted fragments after relative abundance
+    """
     df = pd.read_csv(prob_file)
     if df.shape[0] == 0:
         print(f'no fragments found in {prob_file}')
@@ -555,6 +661,9 @@ def save_individual_hist(prob_file, args):
 
 
 def save_combined_hist(total_freqs, image_name, weights, args):
+    """
+    stacked histogram of all members of community
+    """
     try:
         ax = sns.histplot(data=total_freqs, x='length', hue='name',
                           weights=total_freqs[weights], multiple="stack",
@@ -574,6 +683,14 @@ def save_combined_hist(total_freqs, image_name, weights, args):
 
 
 def prob_to_counts(comb_file, fragment_comps, adjustment, genomes_df):
+    """
+    after calculated per-fragment adjusted probabilities, use the pre-
+    determined "adjustment" constant to update the "adj_prob" column in
+    each digested genome to rounded counts of reads based on the desired
+    library size
+
+    save the dataframes with "counts" column
+    """
     comb_df = pd.read_csv(comb_file)
     count_files_ls = list(set(comb_df['counts_file'].to_list()))
     total = 0
@@ -602,6 +719,9 @@ def prob_to_counts(comb_file, fragment_comps, adjustment, genomes_df):
 
 
 def write_final_file(args, genomes_df):
+    """
+    calculate simple summary statistics for genomes_df and write to file
+    """
     genomes_df['avg_depth'] = genomes_df['reads'] / genomes_df['sites']
     genomes_df['depth_abundance'] = genomes_df['avg_depth'] / \
         genomes_df['avg_depth'].sum()
@@ -611,6 +731,13 @@ def write_final_file(args, genomes_df):
 
 
 def write_genomes(comb_file, fragment_comps, adjustment):
+    """
+    write probability and size-selection adjusted fragment counts as
+    adapter-ligated, simulated fastq paired-end read files (sim1/sim2)
+
+    each count file (as listed in the comb_file) is opened as a pandas
+    dataframe and passed to the write_reads script
+    """
     comb_df = pd.read_csv(comb_file)
     count_files_ls = list(set(comb_df['counts_file'].to_list()))
 
@@ -636,6 +763,11 @@ def write_genomes(comb_file, fragment_comps, adjustment):
 
 
 def simulate_error(command, sim_in, error_out):
+    """
+    if selected, calls apply_error.cpp (from src directory) to directly
+    mutate single bases based on the input phred likelihood of miscall
+    stored in the q scores
+    """
     try:
         process = subprocess.Popen([command, sim_in, error_out], shell=False)
         out, err = process.communicate()

@@ -77,6 +77,10 @@ def length_dict(df, args):
 
 
 def get_custom_dist(len_dt, args):
+    """
+    if user-provided fragment length : fragment frequency json file is
+    provided, open and use as fragments_dt dictionary
+    """
     with open(args.d) as f_o:
         tmp_dt = json.load(f_o)
 
@@ -93,6 +97,10 @@ def get_custom_dist(len_dt, args):
 
 
 def get_custom_draw_dict(fragments_dt, args):
+    """
+    if using user-defined fragment distribution, use dictionary of input
+    fragment sizes
+    """
     draw_dt = {}
 
     for x in range(0, args.max + 1):
@@ -102,7 +110,20 @@ def get_custom_draw_dict(fragments_dt, args):
 
 
 def get_scale_gauss(len_dt, args):
-    x_dist = min(args.x - 0, abs(args.max - args.sd), args.max - args.x)
+    """
+    in order to scale the Gaussian distribution probabilities into
+    fragment counts, we first need to define the intersection of the
+    existing fragment distribution and the size selectin distribution
+
+    for fragment length x (default = gaussian mean), get an average
+    abundance to scale the gaussian probability density function by
+    calculating the average fragment length x_dist base-pairs fewer
+    and greater than x
+
+    returns scale_by, a constant to scale pdf probability at point x to
+    the counts in len_dt[x]
+    """
+    x_dist = min(args.x, abs(args.max - args.sd), args.max - args.x)
     x_range = [len_dt[i] for i in range(args.x-x_dist, args.x+x_dist+1)]
 
     try:
