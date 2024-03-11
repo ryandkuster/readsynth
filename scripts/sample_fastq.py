@@ -71,7 +71,6 @@ def open_fastq(r1_out, r2_out, args):
     r2_out.close()
 
 
-
 if __name__ == '__main__':
     args = parse_user_input()
     if args.r1 or args.r2:

@@ -85,6 +85,9 @@ def digest_frag(chrom, fragment, motif1, f_start, args):
 
 
 def internal_sites(subseq, all_motifs):
+    """
+    search each subsequence to return a count of internal motif sequences
+    """
     internals = 0
     for motif3 in all_motifs:
         hits = [m.start() for m in re.finditer('(?=' + motif3 + ')', subseq)]
