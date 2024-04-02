@@ -302,10 +302,10 @@ def create_adapters(args):
           'rs2']
     m1 = list(args.motif_dt1.keys())[0]
     m2 = list(args.motif_dt2.keys())[0]
-    a1[0] = a1[0] + m1[:args.motif_dt1[m1]]
-    a1[1] = m1[args.motif_dt1[m1]:] + a1[1]
-    a2[0] = a2[0] + m2[:args.motif_dt2[m2]]
-    a2[1] = m2[args.motif_dt2[m2]:] + a2[1]
+    a1[0] = a1[0] + args.m1[0][:args.motif_dt1[m1]]
+    a1[1] = args.m1[0][args.motif_dt1[m1]+1:] + a1[1]
+    a2[0] = a2[0] + args.m2[0][:args.motif_dt2[m2]]
+    a2[1] = args.m2[0][args.motif_dt2[m2]+1:] + a2[1]
 
     return [a1], [a2]
 
@@ -490,6 +490,17 @@ def process_df(df, digest_file, args):
     df = df.reset_index(drop=True)
 
     """
+    remove fragments where RE motif sites overlap
+    """
+    df['min_len_m1'] = df['m1'].map(args.motif_len)
+    df['min_len_m2'] = df['m2'].map(args.motif_len)
+    df['min_len'] = df['min_len_m1'] + df['min_len_m2']
+    df = df[df['seq'].str.len() > df['min_len']]
+    df.drop('min_len_m1', axis=1, inplace=True)
+    df.drop('min_len_m2', axis=1, inplace=True)
+    df.drop('min_len', axis=1, inplace=True)
+
+    """
     convert all redundant IUPAC codes to 'N'
     """
     df['seq'] = df['seq'].str.replace('[RYSWKMBDHV]', 'N', regex=True)
@@ -536,8 +547,9 @@ def process_df(df, digest_file, args):
     """
     add a quick step that removes appropriate over/underhang
     """
+
     for mot, front in args.motif_dt.items():
-        back = len(mot) - front
+        back = args.motif_len[mot] - front
         df.loc[(df['m1'] == mot) & (df['reverse'] == 0), 'seq'] = \
             df['seq'].str[front:]
         if back != 0:
@@ -560,7 +572,10 @@ def process_df(df, digest_file, args):
             df.loc[(df['m2'] == mot) & (df['reverse'] == 1), 'revc'] = \
                 df['revc'].str[:-back]
 
+
     df['length'] = df['seq'].str.len()
+    #df = df[(df['seq'].str.len() > 0) & (df['revc'].str.len() > 0)]
+
     df = df.sort_values(by=['length'])
     df = df.reset_index(drop=True)
     df.to_csv(digest_file, index=None)

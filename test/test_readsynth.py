@@ -144,6 +144,8 @@ class TestInitFunctions(unittest.TestCase):
         args = Variables()
         args.motif_dt1 = {'GCGC': 3}
         args.motif_dt2 = {'TTAA': 1}
+        args.m1 = ['GCG/C']
+        args.m2 = ['T/TAA']
         a1 = [['AATGATACGGCGACCACCGAGATCTACACTCGTCGGCAGCGTCAGATGTGTATAAGAGACAGGCG',
                'CCTGTCTCTTATACACATCTGACGCTGCCGACGAGTGTAGATCTCGGTGGTCGCCGTATCATT',
                'rs1']]
@@ -158,6 +160,8 @@ class TestInitFunctions(unittest.TestCase):
         args = Variables()
         args.motif_dt1 = {'GAATTC': 1}
         args.motif_dt2 = {'TTAA': 1}
+        args.m1 = ['G/AATTC']
+        args.m2 = ['T/TAA']
         a1 = [['AATGATACGGCGACCACCGAGATCTACACTCGTCGGCAGCGTCAGATGTGTATAAGAGACAGG',
                'AATTCCTGTCTCTTATACACATCTGACGCTGCCGACGAGTGTAGATCTCGGTGGTCGCCGTATCATT',
                'rs1']]
@@ -374,6 +378,7 @@ class TestPalindromicFunctions(unittest.TestCase):
         args.motif_dt = {'GCGC': 3}
         args.motif_dt1 = {'GCGC': 3}
         args.motif_dt2 = {'GCGC': 3}
+        args.motif_len = {'GCGC': 4}
         df = pd.read_csv(
             'test_data/genomes/pre_process_hhai_hhai_test1.fasta.csv')
         digest_file = 'test_data/genomes/hhai_hhai_process_df_test.csv'
@@ -392,6 +397,7 @@ class TestPalindromicFunctions(unittest.TestCase):
         args.motif_dt = {'GCGC': 3, 'TTAA': 1}
         args.motif_dt1 = {'GCGC': 3}
         args.motif_dt2 = {'TTAA': 1}
+        args.motif_len = {'GCGC': 4, 'TTAA': 4}
         df = pd.read_csv(
             'test_data/genomes/pre_process_hhai_msei_test1.fasta.csv')
         digest_file = 'test_data/genomes/hhai_msei_process_df_test.csv'
