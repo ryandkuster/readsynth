@@ -300,12 +300,6 @@ def create_adapters(args):
     a2 = ['CAAGCAGAAGACGGCATACGAGATGTCTCGTGGGCTCGGAGATGTGTATAAGAGACAG',
           'CTGTCTCTTATACACATCTCCGAGCCCACGAGACATCTCGTATGCCGTCTTCTGCTTG',
           'rs2']
-    m1 = list(args.motif_dt1.keys())[0]
-    m2 = list(args.motif_dt2.keys())[0]
-    a1[0] = a1[0] + args.m1[0][:args.motif_dt1[m1]]
-    a1[1] = args.m1[0][args.motif_dt1[m1]+1:] + a1[1]
-    a2[0] = a2[0] + args.m2[0][:args.motif_dt2[m2]]
-    a2[1] = args.m2[0][args.motif_dt2[m2]+1:] + a2[1]
 
     return [a1], [a2]
 
@@ -545,36 +539,28 @@ def process_df(df, digest_file, args):
     df = df.reset_index(drop=True)
 
     """
-    add a quick step that removes appropriate over/underhang
+    add a quick step that calculates length based on the adjusted length
+    of sequences after removal of appropriate over/underhang
     """
+
 
     for mot, front in args.motif_dt.items():
         back = args.motif_len[mot] - front
-        df.loc[(df['m1'] == mot) & (df['reverse'] == 0), 'seq'] = \
-            df['seq'].str[front:]
-        if back != 0:
-            df.loc[(df['m1'] == mot) & (df['reverse'] == 0), 'revc'] = \
-                df['revc'].str[:-back]
+        df['adj_seq'] = df['seq']
+        df.loc[(df['m1'] == mot) & (df['reverse'] == 0), 'adj_seq'] = \
+            df['adj_seq'].str[front:]
 
-        df.loc[(df['m1'] == mot) & (df['reverse'] == 1), 'seq'] = \
-            df['seq'].str[:-back]
-        df.loc[(df['m1'] == mot) & (df['reverse'] == 1), 'revc'] = \
-            df['revc'].str[front:]
+        df.loc[(df['m1'] == mot) & (df['reverse'] == 1), 'adj_seq'] = \
+            df['adj_seq'].str[:-back]
 
-        df.loc[(df['m2'] == mot) & (df['reverse'] == 0), 'seq'] = \
-            df['seq'].str[:-back]
-        df.loc[(df['m2'] == mot) & (df['reverse'] == 0), 'revc'] = \
-            df['revc'].str[front:]
+        df.loc[(df['m2'] == mot) & (df['reverse'] == 0), 'adj_seq'] = \
+            df['adj_seq'].str[:-back]
 
-        df.loc[(df['m2'] == mot) & (df['reverse'] == 1), 'seq'] = \
-            df['seq'].str[front:]
-        if back != 0:
-            df.loc[(df['m2'] == mot) & (df['reverse'] == 1), 'revc'] = \
-                df['revc'].str[:-back]
+        df.loc[(df['m2'] == mot) & (df['reverse'] == 1), 'adj_seq'] = \
+            df['adj_seq'].str[front:]
 
-
-    df['length'] = df['seq'].str.len()
-    #df = df[(df['seq'].str.len() > 0) & (df['revc'].str.len() > 0)]
+    df['length'] = df['adj_seq'].str.len()
+    df.drop('adj_seq', axis=1, inplace=True)
 
     df = df.sort_values(by=['length'])
     df = df.reset_index(drop=True)
