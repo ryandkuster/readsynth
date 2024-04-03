@@ -142,31 +142,11 @@ class TestInitFunctions(unittest.TestCase):
 
     def test_create_adapters_1(self):
         args = Variables()
-        args.motif_dt1 = {'GCGC': 3}
-        args.motif_dt2 = {'TTAA': 1}
-        args.m1 = ['GCG/C']
-        args.m2 = ['T/TAA']
-        a1 = [['AATGATACGGCGACCACCGAGATCTACACTCGTCGGCAGCGTCAGATGTGTATAAGAGACAGGCG',
-               'CCTGTCTCTTATACACATCTGACGCTGCCGACGAGTGTAGATCTCGGTGGTCGCCGTATCATT',
+        a1 = [['AATGATACGGCGACCACCGAGATCTACACTCGTCGGCAGCGTCAGATGTGTATAAGAGACAG',
+               'CTGTCTCTTATACACATCTGACGCTGCCGACGAGTGTAGATCTCGGTGGTCGCCGTATCATT',
                'rs1']]
-        a2 = [['CAAGCAGAAGACGGCATACGAGATGTCTCGTGGGCTCGGAGATGTGTATAAGAGACAGT',
-               'TAACTGTCTCTTATACACATCTCCGAGCCCACGAGACATCTCGTATGCCGTCTTCTGCTTG',
-               'rs2']]
-        args.a1, args.a2 = rs.create_adapters(args)
-        self.assertEqual(args.a1, a1)
-        self.assertEqual(args.a2, a2)
-
-    def test_create_adapters_2(self):
-        args = Variables()
-        args.motif_dt1 = {'GAATTC': 1}
-        args.motif_dt2 = {'TTAA': 1}
-        args.m1 = ['G/AATTC']
-        args.m2 = ['T/TAA']
-        a1 = [['AATGATACGGCGACCACCGAGATCTACACTCGTCGGCAGCGTCAGATGTGTATAAGAGACAGG',
-               'AATTCCTGTCTCTTATACACATCTGACGCTGCCGACGAGTGTAGATCTCGGTGGTCGCCGTATCATT',
-               'rs1']]
-        a2 = [['CAAGCAGAAGACGGCATACGAGATGTCTCGTGGGCTCGGAGATGTGTATAAGAGACAGT',
-               'TAACTGTCTCTTATACACATCTCCGAGCCCACGAGACATCTCGTATGCCGTCTTCTGCTTG',
+        a2 = [['CAAGCAGAAGACGGCATACGAGATGTCTCGTGGGCTCGGAGATGTGTATAAGAGACAG',
+               'CTGTCTCTTATACACATCTCCGAGCCCACGAGACATCTCGTATGCCGTCTTCTGCTTG',
                'rs2']]
         args.a1, args.a2 = rs.create_adapters(args)
         self.assertEqual(args.a1, a1)

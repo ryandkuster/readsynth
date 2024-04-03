@@ -1,3 +1,5 @@
+mkdir ecori_msei_10M_output
+
 python3 ../../readsynth.py \
   -g abundances.csv \
   -o ecori_msei_10M_output/ \
