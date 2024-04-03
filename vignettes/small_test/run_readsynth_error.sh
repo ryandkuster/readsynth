@@ -1,3 +1,5 @@
+mkdir small_ecori_msei_1M_error_output
+
 python3 ../readsynth/readsynth.py \
   -g abundances.csv \
   -o small_ecori_msei_1M_error_output/ \
