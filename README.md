@@ -1,4 +1,4 @@
-readsynth is currently in an early release state. If you have any suggestions, questions, or concerns, please open an issue or contact rkuster@utk.edu.
+If you have any suggestions, questions, or concerns, please open an issue or contact rkuster@utk.edu.
 
 <img src=resources/images/readsynth_logo_blue.png width="600">
 
