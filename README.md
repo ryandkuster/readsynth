@@ -2,6 +2,8 @@ If you have any suggestions, questions, or concerns, please open an issue or con
 
 <img src=resources/images/readsynth_logo_blue.png width="600">
 
+See the readsynth publication at https://doi.org/10.1186/s12859-024-05809-3
+
 ## what is readsynth?
 Readsynth simulates Illumina sequenced metagenomes allowing comparison of library approaches including amplicon and reduced metagenome sequencing (RMS). The software takes as input any reference genome sequences in fasta format along with custom primer/restriction enzyme and adapter sequences to simulate the reads expected from an Illumina-based sequencing reaction. Simulated fastq reads capture the expected composition of the input taxa, and are sensitive to changes in the underlying distributions of DNA fragments when digests or size selection are performed. 
 
