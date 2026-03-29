@@ -1,4 +1,6 @@
-If you have any suggestions, questions, or concerns, please open an issue or contact rkuster@utk.edu.
+![GitHub release](https://img.shields.io/github/v/release/ryandkuster/readsynth)
+![GitHub tag (latest by date)](https://img.shields.io/github/v/tag/ryandkuster/readsynth?include_prereleases)
+![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)
 
 <img src=resources/images/readsynth_logo_blue.png width="600">
 
