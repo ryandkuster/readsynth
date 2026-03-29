@@ -1,3 +1,0 @@
-seq,start,end,m1,m2,internal,reverse,length,probability,adj_prob
-TAANNNNNNNNNNNNNNNNNNNNNGCG,25,50,TTAA,GCGC,0,0,27,1,0.75
-TAANNNNNNNNNNNNNNNNNNNNNGCG,50,75,GCGC,TTAA,0,1,27,1,0.75

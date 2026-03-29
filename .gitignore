@@ -1,11 +1,9 @@
 # ignore these:
 /raw_data/*
-/tests/test_*
-/tests/*
+/target/
 /.vscode/*
 /.ipynb_checkpoints/*
 /.idea/*
-/src/apply_error
 __pycache__/
 .DS_Store
 *fastq
